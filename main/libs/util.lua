@@ -1,15 +1,21 @@
-local storage = storage or {}
-local discordia = discordia or nil
-local client = client or nil
+local storage = nil
+local discordia = nil
+local client = nil
+local logger = nil
+local save = nil
 -- Don't like these. I hate multi file but I want to stay decently organized now.
 local util = {}
 
-function util.init(discordia_in, client_in, storage_in)
-  discordia = discordia_in
-  client = client_in
-  storage = storage_in
+function util.logInChannel(guildId, payload)
+	if not guildId or not payload then return end
+	local logChannel = storage[guildId].logChannel
+	if logChannel then
+		local ch = client:getChannel(logChannel)
+		if ch then
+			ch:send(payload)
+		end
+	end
 end
-
 function util.parseNumber(s)
 	if not s then return nil end
 	s = s:lower():gsub(',','')
@@ -48,7 +54,7 @@ function util.formatTime(n)
 	end
 	return string.format("%d:%02d", minutes, seconds)
 end
-function util.computeDerived(e)
+function util.computeDerived(e, guildId)
 	local sp = tonumber(e.stockpile) or 0
 	local cons = tonumber(e.consumption)
 	local rcalls = tonumber(e.recipeCalls)
@@ -74,9 +80,13 @@ function util.computeDerived(e)
 	--if e.time_h then e.time_h = math.floor(e.time_h*10)/10 end
 	for _,k in ipairs({'msupp12','msupp24','msupp48'}) do if e[k] then e[k]=math.floor(e[k]*10)/10 end end
 	if not e.isGenerator then
-		logger:log(3,"Computing MSupp site: "..e.name.." with "..util.formatShort(sp).." in stockpile, with a "..cons.." hourly rate.")
+		local txt = "Computing MSupp site: '"..e.name.."' with "..util.formatShort(sp).." in stockpile, and "..cons.."MSupps at an hourly rate."
+		util.logInChannel(guildId, txt)
+		logger:log(3,txt)
 	else
-		logger:log(3,"Computing Gen   Site: "..e.name.." with "..util.formatShort(sp).." in stockpile, with a call of "..rcalls.." every "..util.formatTime(rmins or -1)..".")
+		local txt = "Computing Gen   Site: '"..e.name.."' with "..util.formatShort(sp).." in stockpile, with a call of "..rcalls.." every "..util.formatTime(rmins or -1).."."
+		util.logInChannel(guildId, txt)
+		logger:log(3,txt)
 	end
 end
 function util.renderEmbed(e)
@@ -258,18 +268,29 @@ function util.buildGoalEmbed(guildObj)
 	return {
 		embed = {
 			title = "Current Server Goals",
-			description = "Goal summary for "..(guildObj.name),
+			description = "Goal summary for "..(guildObj.name).."\n-# You can add to these! Do `!goal` for more info",
 			fields = fields,
 			color = discordia.Color.fromRGB(94, 180, 121).value,
 			timestamp = discordia.Date():toISO('T','Z')
 		}
 	}
 end
+local todelete = {}
 function util.addToDelete(message, timeToDelete)
 	local tim = (timeToDelete or 2.5) + os.time()
 	local data = {[1] = message, [2] = tim}
 	table.insert(todelete,data)
 	logger:log(3, 'Added message to delete table in '..(timeToDelete or 2.5)..'s')
+end
+
+function util.init(discordia_in, client_in, storage_in, logger_in, save_in)
+	discordia	= discordia_in
+	client		= client_in
+	storage		= storage_in
+	logger		= logger_in
+	save		= save_in
+	print("1")
+	return util
 end
 
 return util
