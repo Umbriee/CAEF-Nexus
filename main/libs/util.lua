@@ -80,6 +80,26 @@ function util.formatTime(n)
 	end
 	return string.format("%d:%02d", minutes, seconds)
 end
+function util.grabmsg(guildId,channelId,msgId)
+	local guild = client:getGuild(guildId)
+	local channel
+	local msg
+	if guild then
+		channel = guild:getChannel(channelId)
+		if channel then
+			if msgId then
+				msg = channel:getMessage(msgId)
+			else
+				msg = false
+			end
+		else
+			channel = false
+		end
+	else
+		guild = false
+	end
+	return msg, channel, guild
+end
 function util.computeDerived(e, guildId)
 	local sp = tonumber(e.stockpile) or 0
 	local cons = tonumber(e.consumption)
@@ -338,6 +358,9 @@ function util.updateStockpileEmbed(guildId, data)
 				if msg and msg.author == client.user then
 					msg:setContent(payload.content or "")
 					msg:setEmbed(payload.embed)
+					data.messageId = msg.id
+					storage[guildId].stockpiles[data.name:lower()] = data
+					saveData()
 					return true
 				else
 					local sent = ch:send(payload)

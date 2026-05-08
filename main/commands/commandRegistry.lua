@@ -473,12 +473,12 @@ commandRegistry.cmds["settimer"] = {
 commandRegistry.cmds["stockpile"] = {
 	cmd = "stockpile",
 	abbreviation = "sp", -- May make it easier to type out.
-	helper = "stockpile [name] [location or newly refreshed time] [code] <time remaining or 2d1h (accepts #d#h#m or hh:mm)> -- Registers a stockpile, which can automatically give notifications for how long it'll last or if it'll expire.",
+	helper = "stockpile [name] [location] [code] <time remaining or 2d1h (accepts #d#h#m or hh:mm)> **OR** "..commandPrefix.."stockpile [name] <time 2d1h> -- Can either register a stockpile, or update a pre-existing one. Fallsback to 2 days & 1 hour if the time field is missing.",
 	fields = {"string","string/time","string","time"},
 	func = function(message, args)
 		local guild = message.guild
 		if not guild then return end
-		local name = args[2]
+		local name, key = args[2],args[2]:lower()
 		local arg3 = args[3]
 		local arg4 = args[4]
 		local arg5 = args[5]
@@ -491,14 +491,12 @@ commandRegistry.cmds["stockpile"] = {
 			message:delete(); return
 		end
 		storage[guild.id].stockpiles = storage[guild.id].stockpiles or {}
-		local existing = storage[guild.id].stockpiles[name:lower()]
-
+		local existing = storage[guild.id].stockpiles[key]
 		local function isTimeFormat(s)
 			if not s then return false end
 			-- crude check: contains d or h or m or ":" or is all digits (e.g., "2h", "90m", "01:30")
 			return string.find(s, "%d+[dhm]") or string.find(s, ":")
 		end
-
 		-- Decide whether arg3 is a time (refresh) or a location
 		local location, code, expireTime
 		if isTimeFormat(arg3) then
@@ -525,7 +523,7 @@ commandRegistry.cmds["stockpile"] = {
 				code = code or existing.code,
 				expireTime = expireTime or existing.expireTime
 			}
-			if util.stockpileAlerts[name:lower()] then util.stockpileAlerts[name:lower()] = nil end
+			if util.stockpileAlerts[key] then util.stockpileAlerts[key] = nil end
 			if existing.messageId then build.messageId = existing.messageId end
 			util.updateStockpileEmbed(guild.id, build)
 			util.addToDelete(message:reply("Stockpile: [" .. build.name .. " @ "..build.loc.."] updated; expires " .. util.unixTimestamp(build.expireTime)))
@@ -535,8 +533,38 @@ commandRegistry.cmds["stockpile"] = {
 			message:delete(); return
 			end
 			util.updateStockpileEmbed(guild.id, { name = name, loc = location, code = code, expireTime = expireTime })
-			util.addToDelete(message:reply("Stockpile: [" .. name .. " - " .. location .. "] added and set to give warnings before " .. util.unixTimestamp(expireTime)))
+			util.addToDelete(message:reply("Stockpile: [" .. name .. " - " .. location .. "] added to registry, will expire " .. util.unixTimestamp(expireTime)))
 		end
+		message:delete()
+	end
+}
+commandRegistry.cmds["rmvstockpile"] = {
+	cmd = "rmvstockpile",
+	abbreviation = "rsp",
+	helper = "stockpile [name] -- removes a stockpile from data.",
+	fields = {"string"},
+	func = function(message, args)
+		local name, key = args[2],args[2]:lower()
+		if not name then
+			util.addToDelete(message:reply("Usage: !rmvstockpile [name]"))
+			message:delete(); return
+		end
+		if storage[message.guild.id].stockpiles[key] then
+			if util.stockpileAlerts[key] then
+				util.stockpileAlerts[key] = nil
+			end
+			if storage[message.guild.id].stockpiles[key].messageId then
+				local msg = util.grabmsg(message.guild.id,storage[message.guild.id].stockpileChannel.channelId,storage[message.guild.id].stockpiles[key].messageId)
+				if msg then
+					msg:delete()
+				end
+			end
+			storage[message.guild.id].stockpiles[key] = nil
+			util.addToDelete(message:reply("Deleting "..name.." from stockpile entry.."))
+		else
+			util.addToDelete(message:reply("Entry, "..name..", not found?"))
+		end
+		saveData()
 		message:delete()
 	end
 }

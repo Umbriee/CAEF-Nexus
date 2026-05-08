@@ -10,7 +10,7 @@ _G.permissions		= discordia.Permissions()
 _G.localSaveData	= 'privateStorage/data.json'
 -- I was told that _G is something not to use all that much.. Buut..
 
-commandPrefix = "!"
+_G.commandPrefix = "!"
 local cooldown = os.time()
 local cooldownTime = 2.00
 _G.storage = {}
@@ -221,7 +221,7 @@ clock:on('min', function(now)
 								if (data2.expireTime - 3600) <= os.time() then
 									if not util.stockpileAlerts[key2] then
 										util.stockpileAlerts[key2] = true
-										ch:send("`[Alarm]` - Stockpile, "..data2.name.." in "..data2.loc..", is about to expire. "..util.unixTimestamp(data2.expireTime).."\n-# Use `!stockpile "..data2.name.." 2d1h` or whatever the time may be to refresh this.")
+										util.addToDelete(ch:send("`[⚠Alert]` - Stockpile, "..data2.name.." in "..data2.loc..", is about to expire. "..util.unixTimestamp(data2.expireTime).."\n-# Use `!stockpile "..data2.name.." 2d1h` or whatever the time may be to refresh this."),1500)
 									end
 								end
 							end
