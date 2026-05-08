@@ -10,14 +10,18 @@ commandRegistry.cmds = {}
 commandRegistry.cmds["create"] = {
 	cmd = "create",
 	helper = "create Name [stockpile] [consumption]",
+	fields = {"string","number","number"},
 	func = function(message, args)
 		local name = args[2] or ("site_"..tostring(os.time()))
 		local sp = util.parseNumber(args[3])
 		local cons = util.parseNumber(args[4])
+		if not sp or not cons then message:delete() message:rely("Invalid, or too few, fields: !create Name [stockpile(num)] [consumption(num)]") return end
 		local e = { name = name, stockpile = sp or 0, consumption = cons or nil, isGenerator = false, lastUpdate = os.time() }
 		util.computeDerived(e, message.guild.id)
 		e.nonce = tostring(os.time()) .. tostring(math.random(1000,9999))
-		storage.entries[e.nonce] = e
+		storage[message.guild.id] = storage[message.guild.id] or {}
+		storage[message.guild.id].upkeepEntries = storage[message.guild.id].upkeepEntries or {}
+		storage[message.guild.id].upkeepEntries[e.nonce] = e
 		save()
 		util.updateSummaryMessage(message.channel)
 		message:delete()
@@ -26,9 +30,10 @@ commandRegistry.cmds["create"] = {
 commandRegistry.cmds["creategen"] = {
 	cmd = "creategen",
 	helper = "creategen [Name] [stockpile] <calls> <M:SS or minutes>",
+	fields = {"string","number","number","time"},
 	func = function(message, args)
 		local name = args[2]
-		if not name then util.addToDelete(message:reply("Usage: !creategen [Name] [stockpile] <calls> <M:SS or minutes>"),10); message:delete(); return end
+		if not name or not args[3] then util.addToDelete(message:reply("Invalid, or too few, fields: !creategen [Name] [stockpile] <calls> <M:SS or minutes>"),10); message:delete(); return end
 		local idx = 3
 		local spCandidate = util.parseNumber(args[idx])
 		local sp, calls, rtime
@@ -39,7 +44,9 @@ commandRegistry.cmds["creategen"] = {
 		local e = { name = name, stockpile = sp or 0, recipeCalls = calls, recipeMins = rtime, consumption = nil, isGenerator = true, lastUpdate = os.time() }
 		util.computeDerived(e, message.guild.id)
 		e.nonce = tostring(os.time()) .. tostring(math.random(1000,9999))
-		storage.entries[e.nonce] = e
+		storage[message.guild.id] = storage[message.guild.id] or {}
+		storage[message.guild.id].upkeepEntries = storage[message.guild.id].upkeepEntries or {}
+		storage[message.guild.id].upkeepEntries[e.nonce] = e
 		save()
 		util.updateSummaryMessage(message.channel)
 		message:delete()
@@ -48,11 +55,16 @@ commandRegistry.cmds["creategen"] = {
 commandRegistry.cmds["update"] = {
 	cmd = "update",
 	helper = "update [name] [stockpile] <consumption> <Time M:SS (generator only)>",
+	fields = {"string","number","number","time"},
 	func = function(message, args)
+		if not storage[message.guild.id].upkeepEntries then
+			message:reply("No sites found in server data. Type `!create` or `!creategen`for more info.")
+			return
+		end
 		local name = args[2]
 		if not name then util.addToDelete(message:reply("Usage: !update [Name] [stockpile] [consumption] [Time(gen only)]"));  else
 			local entry;  
-			for _,v in pairs(storage.entries) do if v.name:lower() == name:lower() then entry = v; break end end
+			for _,v in pairs(storage[message.guild.id].upkeepEntries) do if v.name:lower() == name:lower() then entry = v; break end end
 			if not entry then 
 				util.addToDelete(message:reply("Entry, "..name..", not found?"));  
 			else
@@ -85,13 +97,18 @@ commandRegistry.cmds["update"] = {
 commandRegistry.cmds["remove"] = {
 	cmd = "remove",
 	helper = "remove [site]",
+	fields = {"string"},
 	func = function(message, args)
+		if not storage[message.guild.id].upkeepEntries then
+			message:reply("No sites found in server data. Type `!create` or `!creategen`for more info.")
+			return
+		end
 		local name = args[2]
 		if not name then
 			util.addToDelete(message:reply("Usage: !remove [Site]"),10)
 		else
 			local foundKey, entry
-			for k, v in pairs(storage.entries) do
+			for k, v in pairs(storage[message.guild.id].upkeepEntries) do
 				if v.name and v.name:lower() == name:lower() then
 				foundKey, entry = k, v
 				break
@@ -100,8 +117,9 @@ commandRegistry.cmds["remove"] = {
 			if not foundKey then
 				util.addToDelete(message:reply("Entry, "..name..", not found?"),10)
 			else
-				storage.entries[foundKey] = nil
-				util.logInChannel(message.guild.id,"Removing site '"..foundKey.."'")
+				local site = storage[message.guild.id].upkeepEntries[foundKey]
+				util.logInChannel(message.guild.id,"Removing site '"..site.name.."'")
+				storage[message.guild.id].upkeepEntries[foundKey] = nil
 				save()
 				util.updateSummaryMessage(message.channel)
 			end
@@ -109,16 +127,49 @@ commandRegistry.cmds["remove"] = {
 		message:delete()
 	end
 }
+commandRegistry.cmds["upkeepsummary"] = {
+	cmd = "upkeepsummary",
+	helper = "upkeepSummary -- changes or moves the upkeepSummary",
+	perms = {"administrator"},
+	func = function(message, args)
+		if not storage[message.guild.id].upkeepEntries then
+			message:reply("No sites found in server data. Type `!create` or `!creategen`for more info.")
+			return
+		end
+		local saved = storage[message.guild.id].savedSummary or {}
+		if saved.messageId and saved.channelId then
+			local ch = client:getChannel(saved.channelId)
+			if ch then
+				local msg = ch:getMessage(saved.messageId)
+				if msg then
+					msg:delete()
+				end
+			end
+		end
+		local payload = util.buildSummaryEmbed(message.guild.id)
+		local sent = message.channel:send(payload)
+		if sent then
+			storage[message.guild.id].savedSummary = { channelId = message.channel.id, messageId = sent.id }
+			save()
+		end
+		message:delete()
+	end
+}
 commandRegistry.cmds["show"] = {
 	cmd = "show",
 	helper = "show [all or site]",
+	fields = {"string"},
 	func = function(message, args)
+		if not storage[message.guild.id].upkeepEntries then
+			message:reply("No sites found in server data. Type `!create` or `!creategen`for more info.")
+			return
+		end
 		local target = args[2]
 		if not target or target:lower() == 'all' then
-			for _,e in pairs(storage.entries) do message.channel:send(util.renderEmbed(e)) end
+			for _,e in pairs(storage[message.guild.id].upkeepEntries) do message.channel:send(util.renderEmbed(e)) end
 		else
 			local found
-			for _,e in pairs(storage.entries) do if e.name:lower() == target:lower() then found = e; break end end
+			for _,e in pairs(storage[message.guild.id].upkeepEntries) do if e.name:lower() == target:lower() then found = e; break end end
 			if not found then message:reply("Not found") else message.channel:send(util.renderEmbed(found)) end
 		end
 		message:delete()
@@ -126,6 +177,7 @@ commandRegistry.cmds["show"] = {
 }
 commandRegistry.cmds["sendrole"] = {
 	cmd = "sendrole",
+	perms = {"manageRoles"},
 	func = function(message, args)
 		storage[message.guild.id] = storage[message.guild.id] or {}
 		local guildStore = storage[message.guild.id]
@@ -183,6 +235,7 @@ commandRegistry.cmds["sendrole"] = {
 }
 commandRegistry.cmds["rmvrole"] = {
 	cmd = "rmvrole",
+	perms = {"manageRoles"},
 	func = function(message, args)
 		storage[message.guild.id] = storage[message.guild.id] or {}
 		local guildStore = storage[message.guild.id]
@@ -207,6 +260,7 @@ commandRegistry.cmds["rmvrole"] = {
 commandRegistry.cmds["goalcreate"] = {
 	cmd = "goalcreate",
 	helper = "goalcreate [name] [goalammount] <currently at?>",
+	fields = {"string","number","number"},
 	func = function(message, args)
 		local name = args[2]
 		if not name then 
@@ -230,9 +284,62 @@ commandRegistry.cmds["goalcreate"] = {
 		end
 	end
 }
+commandRegistry.cmds["goalremove"] = {
+	cmd = "goalremove",
+	helper = "goalremove [All or Name]",
+	fields = {"string"},
+	func = function(message, args)
+		local name = args[2]
+		if not name then
+			util.addToDelete(message:reply("Usage: !goalremove [All or name]"),10)
+		else 
+			if name == 'all' then
+				if not storage[message.guild.id].goals then
+					util.addToDelete(message:reply("`[Err]` - no goals exists on server?"));
+				else
+					storage[message.guild.id].goalsSummary = storage[message.guild.id].goalsSummary or {}
+					if not storage[message.guild.id].goalsSummary then
+						util.addToDelete(message:reply("`[Err]` - no goals exists on server?"));
+					else
+						local ch = client:getChannel(storage[message.guild.id].goalsSummary.channelId)
+						if ch then
+							local msg = ch:getMessage(storage[message.guild.id].goalsSummary.messageId)
+							if msg then
+								msg:delete()
+								storage[message.guild.id].goalsSummary = {}
+								save()
+							else
+								storage[message.guild.id].goalsSummary = {}
+								save()
+							end
+						else
+							storage[message.guild.id].goalsSummary = {}
+							save()
+						end
+					end
+				end
+			else
+				local entry; for key,g in pairs(storage[message.guild.id].goals) do; if (g.name:lower() or "") == name:lower() then; entry = key; break; end end
+				if not entry then
+					util.addToDelete(message:reply("`[Err]` - goal doesn't exists?"))
+				else
+					if storage[message.guild.id].goals[entry] then
+						storage[message.guild.id].goals[entry] = nil
+						save()
+					else
+						util.addToDelete(message:reply("`[Err]` - goal doesn't exists?"))
+					end
+					save()
+				end
+			end
+		end
+		message:delete()
+	end
+}
 commandRegistry.cmds["goal"] = {
 	cmd = "goal",
 	helper = "goal [name] [Current, appending # will set otherwise will add or subtract] <goalammount>",
+	fields = {"string","number","number"},
 	func = function(message, args)
 		local name = args[2]
 		if not name then 
@@ -331,66 +438,24 @@ commandRegistry.cmds["goal"] = {
 		message:delete()
 	end
 }
-commandRegistry.cmds["goalremove"] = {
-	cmd = "goalremove",
-	helper = "goalremove [All or Name]",
-	func = function(message, args)
-		local name = args[2]
-		if not name then
-			util.addToDelete(message:reply("Usage: !goalremove [All or name]"),10)
-		else 
-			if name == 'all' then
-				if not storage[message.guild.id].goals then
-					util.addToDelete(message:reply("`[Err]` - no goals exists on server?"));
-				else
-					storage[message.guild.id].goalsSummary = storage[message.guild.id].goalsSummary or {}
-					if not storage[message.guild.id].goalsSummary then
-						util.addToDelete(message:reply("`[Err]` - no goals exists on server?"));
-					else
-						local ch = client:getChannel(storage[message.guild.id].goalsSummary.channelId)
-						if ch then
-							local msg = ch:getMessage(storage[message.guild.id].goalsSummary.messageId)
-							if msg then
-								msg:delete()
-								storage[message.guild.id].goalsSummary = {}
-								save()
-							else
-								storage[message.guild.id].goalsSummary = {}
-								save()
-							end
-						else
-							storage[message.guild.id].goalsSummary = {}
-							save()
-						end
-					end
-				end
-			else
-				local entry; for key,g in pairs(storage[message.guild.id].goals) do; if (g.name:lower() or "") == name:lower() then; entry = key; break; end end
-				if not entry then
-					util.addToDelete(message:reply("`[Err]` - goal doesn't exists?"))
-				else
-					if storage[message.guild.id].goals[entry] then
-						storage[message.guild.id].goals[entry] = nil
-						save()
-					else
-						util.addToDelete(message:reply("`[Err]` - goal doesn't exists?"))
-					end
-					save()
-				end
-			end
-		end
-		message:delete()
-	end
-}
 commandRegistry.cmds["error"] = {
 	cmd = "error",
+	perms = {"administrator"},
 	func = function(message, args)
 		message:delete()
-		error("MANUALLY TRIGGERED ERROR "..args[2])
+		error("MANUALLY TRIGGERED ERROR '"..args[2].."'")
+	end
+}
+commandRegistry.cmds["warapi"] = {
+	cmd = "warapi",
+	func = function(message, args)
+		message:delete()
+		util.updateAPIEmbed(message.channel)
 	end
 }
 commandRegistry.cmds["addlogchannel"] = {
 	cmd = "addlogchannel",
+	perms = {"administrator"},
 	func = function(message, args)
 		local guildId = message.guild.id
 		storage[guildId] = storage[guildId] or {}
@@ -408,7 +473,6 @@ function commandRegistry.init(discordia_in, client_in, storage_in, logger_in, sa
 	logger		= logger_in
 	save		= save_in
 	util		= util_in
-	print("2")
 	return commandRegistry.cmds
 end
 

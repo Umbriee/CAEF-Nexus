@@ -140,9 +140,9 @@ local function scrub(err)
 	end
 	return s
 end 
-local AVALI_HQ = "1458073180013858858"
 local ERR_DEFAULTCH = {CH = "584475744973881419", GD = "551552753961402388"}
 function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...)
+	local sent
 	if status then return ... end
 	if not channelGuild then channelGuild = ERR_DEFAULTCH elseif type(channelGuild) == 'table' then
 	if (not channelGuild.CH) and (not channelGuild.GD) then channelGuild = ERR_DEFAULTCH end end
@@ -182,7 +182,7 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 			if guild2 then
 				ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 				if ch then
-					ch:send(payload)
+					sent = ch:send(payload)
 					success = true
 				end
 			end
@@ -191,36 +191,46 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 		if guild2 then
 			ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 			if ch then
-				ch:send(payload)
+				sent = ch:send(payload)
 				success = true
 			end
 		end
 	end
 	local umbreeUser = client:getUser("397521331803127808") -- Juuust to notify me :)
+
 	if umbreeUser then
 		if channelGuild.GD ~= ERR_DEFAULTCH.GD then
 			if ch then
-				local txt = ERR_FUNNY_MSG[math.random(#ERR_FUNNY_MSG)]
-				ch:send {
-					content = txt,
-					mention = umbreeUser,
-				}
+				local umbeeFound = false
+				for key, data in pairs(ch.guild.members) do
+					local userId = data.id
+					if userId == umbreeUser.id then
+						umbeeFound = true
+						break
+					end
+				end
+				if umbeeFound then
+					local txt = ERR_FUNNY_MSG[math.random(#ERR_FUNNY_MSG)]
+					ch:send {
+						content = txt,
+						mention = umbreeUser,
+					}
+				end
 			end
 		end
 	end
 	if not success then
 		logger:log(2,"[WRN] - Could not find an error channel!")
 	end
+	return sent or false
 end
 
-function errorHandler.init(discordia_in, client_in, storage_in, logger_in, save_in, util_in)
+function errorHandler.init(discordia_in, client_in, storage_in, logger_in, save_in)
 	discordia	= discordia_in
 	client		= client_in
 	storage		= storage_in
 	logger		= logger_in
 	save		= save_in
-	util		= util_in
-	print("3")
 	return errorHandler
 end
 

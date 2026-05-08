@@ -1,8 +1,13 @@
+--local http = require("coro-http")
+--local json = require("json")
+
 local storage = nil
 local discordia = nil
 local client = nil
 local logger = nil
 local save = nil
+local http = nil
+local json = nil
 -- Don't like these. I hate multi file but I want to stay decently organized now.
 local util = {}
 
@@ -103,13 +108,18 @@ function util.renderEmbed(e)
 	}
 	return { embed = { title = (e.isGenerator and "Generator — " or "MSupp — ")..(e.name or "Unknown"), fields = fields, color = color, timestamp = discordia.Date():toISO('T','Z') } }
 end
-function util.buildSummaryEmbed()
+function util.roundNumber(num, decimal)
+	local dec = math.max(math.ceil(decimal or 2) - 1,0)
+	num = math.floor(tonumber(num)*(10^dec))/(10^dec)
+	return num
+end
+function util.buildSummaryEmbed(guildId)
 	local msupps = {}
 	local gens = {}
 	local lowestM = nil -- storing like { time = num, entry = site } yadda yadda
 	local lowestG = nil
 	local totals = {m = {stockpile = 0, msupp12 = 0, msupp24 = 0, msupp48 = 0}, g = {stockpile = 0, msupp12 = 0, msupp24 = 0, msupp48 = 0}}
-	for _,e in pairs(storage.entries) do
+	for _,e in pairs(storage[guildId].upkeepEntries) do
 		local stockpile = tonumber(e.stockpile) or 0
 		local ms12 = tonumber(e.msupp12) or 0
 		local ms24 = tonumber(e.msupp24) or 0
@@ -148,41 +158,39 @@ function util.buildSummaryEmbed()
 	table.sort(gens, name_cmp)
 	table.sort(msupps, name_cmp)
 	local fields = {}
-	--==[ Totals MSupp ]==--
-	table.insert(fields, { name = "Totals (Stockpile | MSupp [12, 24, 48])", value = string.format("`%s`  | `%s`, `%s`, `%s`",
-		util.formatShort(totals.m.stockpile), util.formatShort(totals.m.msupp12), util.formatShort(totals.m.msupp24), util.formatShort(totals.m.msupp48)), inline = false })
-
 	--==[ MSupps Spreadsheet ]==-- 
 	if #msupps > 0 then
+		table.insert(fields, { name = "Totals (Stockpile | MSupp [12, 24, 48])", value = string.format("`%s`  | `%s`, `%s`, `%s`",
+			util.formatShort(totals.m.stockpile), util.formatShort(totals.m.msupp12), util.formatShort(totals.m.msupp24), util.formatShort(totals.m.msupp48)), inline = false })
+
 		local lowestUnixTimeM = lowestM.entry.unixTime or os.time()
 		local lines = {}
 		for _,e in ipairs(msupps) do
 			local time = tonumber(e.time_h) or 0
 			local tcol = (time < 24) and ((time < 12) and "- ⚠" or "!") or "+"
-			table.insert(lines, string.format("%s %s, %s| >%sh |%sm/hr| %s, %s, %s", 
-				tcol, e.name, util.formatShort(tonumber(e.stockpile) or 0), tostring(e.time_h or "N/A"), e.consumption, 
+			table.insert(lines, string.format("%s %s, %s | >%sh |%sm/hr| %s, %s, %s", 
+				tcol, e.name, util.formatShort(tonumber(e.stockpile) or 0), tostring(util.roundNumber(e.time_h) or "N/A"), e.consumption, 
 					util.formatShort(tonumber(e.msupp12) or 0), util.formatShort(tonumber(e.msupp24) or 0), util.formatShort(tonumber(e.msupp48) or 0)))
 		end
 		local lines2 = {}
 		for _,e in ipairs(msupps) do
 			table.insert(lines2,string.format("%s last updated %s | ETA to runout %s", e.name, ("<t:"..(e.lastUpdate or os.time())..":R>"), ("<t:"..(e.unixTime or os.time())..":R>")))
 		end
-		table.insert(fields, { name = "MSupp Sites",		value = "```diff\n" .. table.concat(lines, "\n") .. "\n```", inline = false })
+		table.insert(fields, { name = "<:MaintenanceSuppliesIcon:1501480687251750952> MSupp Sites",		value = "```diff\n" .. table.concat(lines, "\n") .. "\n```", inline = false })
 		table.insert(fields, { name = "Update Times",		value = ("-# - "..table.concat(lines2, "\n-# - ").."\nLowest Site:\n- "..lowestM.entry.name.." has >"..tostring(lowestM.time).."h, will run out ~<t:"..lowestUnixTimeM..":R>"), inline = false })
 	end
-	--==[ Totals Generators ]==--
-	table.insert(fields, { name = "Totals (Stockpile | Fuel [12, 24, 48])", value = string.format("`%s`  | `%s`, `%s`, `%s`",
-		util.formatShort(totals.g.stockpile), util.formatShort(totals.g.msupp12), util.formatShort(totals.g.msupp24), util.formatShort(totals.g.msupp48)), inline = false })
 	
 	--==[ Generators Spreadsheet ]==--
 	if #gens > 0 then
+		table.insert(fields, { name = "Totals (Stockpile | Fuel [12, 24, 48])", value = string.format("`%s`  | `%s`, `%s`, `%s`",
+			util.formatShort(totals.g.stockpile), util.formatShort(totals.g.msupp12), util.formatShort(totals.g.msupp24), util.formatShort(totals.g.msupp48)), inline = false })
 		local lowestUnixTimeG = lowestG.entry.unixTime or os.time()
 		local lines = {}
 		for _,e in ipairs(gens) do
 			local time = tonumber(e.time_h) or 0
 			local tcol = (time < 24) and ((time < 12) and "- ⚠" or "! ") or "+ "
-			table.insert(lines, string.format("%s %s, %s| >%sh |%sx%sm| %s, %s, %s",
-				tcol, e.name, util.formatShort(tonumber(e.stockpile) or 0), tostring(e.time_h or "N/A"),
+			table.insert(lines, string.format("%s %s, %s | >%sh |%sx%sm| %s, %s, %s",
+				tcol, e.name, util.formatShort(tonumber(e.stockpile) or 0), tostring(util.roundNumber(e.time_h) or "N/A"),
 					tostring(e.recipeCalls or "N/A"), util.formatTime(e.recipeMins or -1),
 						util.formatShort(tonumber(e.msupp12) or 0), util.formatShort(tonumber(e.msupp24) or 0), util.formatShort(tonumber(e.msupp48) or 0)))
 		end
@@ -190,14 +198,17 @@ function util.buildSummaryEmbed()
 		for _,e in ipairs(gens) do
 			table.insert(lines2,string.format("%s last updated %s | ETA to runout %s", e.name, ("<t:"..(e.lastUpdate or os.time())..":R>"), ("<t:"..(e.unixTime or os.time())..":R>")))
 		end
-		table.insert(fields, { name = "Generators",			value = "```diff\n" .. table.concat(lines, "\n") .. "\n```", inline = false })
+		table.insert(fields, { name = "<:Orders:1501481297544220673> Generators",			value = "```diff\n" .. table.concat(lines, "\n") .. "\n```", inline = false })
 		table.insert(fields, { name = "Lowest Gen Site",	value = ("-# - "..table.concat(lines2, "\n-# - ").."\nLowest Site:\n- "..lowestG.entry.name.." has >"..tostring(lowestG.time).."h, will run out ~<t:"..lowestUnixTimeG..":R>"), inline = false })
+	end
+	if #fields <= 0 then
+		table.insert(fields, { name = "No data", value = "No data found. Is this a mistake?", inline = false })
 	end
 
 	return {
 		embed = {
-			title = "Logistics Summary",
-			description = "Summary of MSupps and Generators",
+			title = "<:Orders:1501481297544220673> Logistics Summary",
+			description = "Summary of MSupps and Generators\n-# Use either; `!create` `!creategen` or `!update` to get more info on how to write to the logi-summary",
 			fields = fields,
 			color = discordia.Color.fromRGB(114,137,218).value,
 			timestamp = discordia.Date():toISO('T','Z')
@@ -205,8 +216,8 @@ function util.buildSummaryEmbed()
 	}
 end
 function util.updateSummaryMessage(channel)
-	local payload = util.buildSummaryEmbed()
-	local saved = storage.savedSummary
+	local payload = util.buildSummaryEmbed(channel.guild.id)
+	local saved = storage[channel.guild.id].savedSummary or {}
 	if saved.messageId and saved.channelId then
 		local ok, err = pcall(function()
 			local ch = client:getChannel(saved.channelId)
@@ -229,7 +240,7 @@ function util.updateSummaryMessage(channel)
 	if not target then return end
 	local sent = target:send(payload)
 	if sent then
-		storage.savedSummary = { channelId = target.id, messageId = sent.id }
+		storage[channel.guild.id].savedSummary = { channelId = target.id, messageId = sent.id }
 		save()
 	end
 end
@@ -267,7 +278,7 @@ function util.buildGoalEmbed(guildObj)
 	table.insert(fields, { name = "Goals",	value = ("```yml\n"..table.concat(lines, "\n").."\n```"), inline = false })
 	return {
 		embed = {
-			title = "Current Server Goals",
+			title = "<:Orders:1501481297544220673> Current Server Goals",
 			description = "Goal summary for "..(guildObj.name).."\n-# You can add to these! Do `!goal` for more info",
 			fields = fields,
 			color = discordia.Color.fromRGB(94, 180, 121).value,
@@ -275,21 +286,133 @@ function util.buildGoalEmbed(guildObj)
 		}
 	}
 end
-local todelete = {}
+function util.updateGoalEmbed(channelObj)
+	-- todo
+end
+function util.buildAPIEmbed()
+	local warapi = util.grabWarAPI()
+	local fields = {}
+	table.insert(fields, {name = "Time:", value = "Started: <t:"..(math.ceil(warapi.conquestStartTime / 1000))..":R>"..(warapi.conquestEndTime and (", Ended: <t:"..(math.ceil(warapi.conquestEndTime / 1000))..":R>") or ""), inline = false})
+	if warapi.resistanceStartTime then
+		table.insert(fields, {name = "Resistance:", value = "Started: <t:"..(math.ceil(warapi.resistanceStartTime / 1000))..":R>"..(warapi.scheduledConquestEndTime and (", Ended: <t:"..(math.ceil(warapi.scheduledConquestEndTime / 1000))..":R>") or ""), inline = false})
+	end
+	if warapi.winner ~= "NONE" then
+		table.insert(fields, {name = "Winner:", value = "**"..warapi.winner.."**", inline = false})
+	end
+	return {
+		embed = {
+			title = ("<:Orders:1501481297544220673> War-"..(warapi.warNumber or 0).." data <:shared:1501481298672484412>"),
+			description = "Wartime data\n-# Do `!warapi` to update this",
+			fields = fields,
+			color = discordia.Color.fromRGB(94, 180, 121).value,
+			timestamp = discordia.Date():toISO('T','Z')
+		}
+	}
+end
+function util.updateAPIEmbed(channelObj)
+	local payload = util.buildAPIEmbed()
+	local saved = storage[channelObj.guild.id].savedAPI or {}
+	if saved.messageId and saved.channelId then
+		local ok, err = pcall(function()
+			local ch = client:getChannel(saved.channelId)
+			if ch then
+				local msg = ch:getMessage(saved.messageId)
+				if msg and msg.author == client.user then
+					msg:setContent(payload.content or "")
+					msg:setEmbed(payload.embed)
+					return true
+				end
+			end
+			return false
+		end)
+		if ok then save(); return end
+	end
+	local target = channelObj
+	if not target then
+		if saved.channelId then target = client:getChannel(saved.channelId) end
+	end
+	if not target then return end
+	local sent = target:send(payload)
+	if sent then
+		storage[channelObj.guild.id].savedAPI = { channelId = target.id, messageId = sent.id }
+		save()
+	end
+end
+util.APICall = {
+	cooldowns = { war = 30, map = 60 },
+	cache = {
+		war		= { ts = 0, data = nil, fallback = nil },
+		maps	= { ts = {}, data = {}, fallback = {} }
+	}
+}
+local function http_get(url)
+	logger:log(3,"Grabbing http data: '"..url.."'")
+	local res, body = http.request("GET", url)
+	if not res then return nil, "HTTP request failed" end
+	if res.code ~= 200 then return nil, ("HTTP %d"):format(res.code) end
+	local ok, parsed = pcall(json.decode, body)
+	if not ok then return nil, "JSON decode error: "..tostring(parsed) end
+	return parsed
+end
+local function cached_fetch(key, url, cooldown, cache_table, forced, fallback)
+	logger:log(3,"Returning cached fetch: '"..tostring(key).."', '"..tostring(url).."'")
+	forced = forced == true
+	local entry_ts = cache_table.ts[key] or 0
+	local age = os.time() - entry_ts
+	if not forced and cache_table.data[key] and age < cooldown then
+		return cache_table.data[key]
+	end
+	local ok, res = pcall(http_get, url)
+	if ok and res then
+		cache_table.ts[key] = os.time()
+		cache_table.data[key] = res
+		return res
+	end
+	return cache_table.data[key] or fallback or nil
+end
+function util.grabWarAPI(opts)
+	opts = opts or {}
+	return cached_fetch(
+		"war",
+		"https://war-service-live.foxholeservices.com/api/worldconquest/war",
+		util.APICall.cooldowns.war,
+		util.APICall.cache.war and { ts = { war = util.APICall.cache.war.ts }, data = { war = util.APICall.cache.war.data } } or { ts = {}, data = {} },
+		opts.force,
+		opts.fallback or util.APICall.cache.war.fallback
+	)
+end
+local map_endpoints = {
+	list = "https://war-service-live.foxholeservices.com/api/worldconquest/maps",
+	report = "https://war-service-live.foxholeservices.com/api/worldconquest/war/map/%s/report",
+	static = "https://war-service-live.foxholeservices.com/api/worldconquest/war/map/%s/static",
+	dynamic = "https://war-service-live.foxholeservices.com/api/worldconquest/war/map/%s/dynamic"
+}
+function util.grabWarMapAPI(mapIdOrName, mapType, opts)
+	opts = opts or {}
+	if mapType == "list" then
+		return cached_fetch("maplist", map_endpoints.list, util.APICall.cooldowns.map, util.APICall.cache.maps and { ts = util.APICall.cache.maps.ts, data = util.APICall.cache.maps.data } or { ts = {}, data = {} }, opts.force, opts.fallback or util.APICall.cache.maps.fallback)
+	end
+	local id = tostring(mapIdOrName or "unknown")
+	local url = map_endpoints[mapType]:format(id)
+	return cached_fetch(id..":"..mapType, url, util.APICall.cooldowns.map, util.APICall.cache.maps and { ts = util.APICall.cache.maps.ts, data = util.APICall.cache.maps.data } or { ts = {}, data = {} }, opts.force, opts.fallback or util.APICall.cache.maps.fallback)
+end
+
+util.todelete = {}
 function util.addToDelete(message, timeToDelete)
 	local tim = (timeToDelete or 2.5) + os.time()
 	local data = {[1] = message, [2] = tim}
-	table.insert(todelete,data)
+	table.insert(util.todelete,data)
 	logger:log(3, 'Added message to delete table in '..(timeToDelete or 2.5)..'s')
 end
 
-function util.init(discordia_in, client_in, storage_in, logger_in, save_in)
+function util.init(discordia_in, client_in, storage_in, logger_in, save_in, json_in, http_in)
 	discordia	= discordia_in
 	client		= client_in
 	storage		= storage_in
 	logger		= logger_in
 	save		= save_in
-	print("1")
+	http		= http_in
+	json		= json_in
 	return util
 end
 
