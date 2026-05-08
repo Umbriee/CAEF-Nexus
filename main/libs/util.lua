@@ -1,6 +1,3 @@
---local http = require("coro-http")
---local json = require("json")
-
 local storage = nil
 local discordia = nil
 local client = nil
@@ -396,7 +393,6 @@ function util.grabWarMapAPI(mapIdOrName, mapType, opts)
 	local url = map_endpoints[mapType]:format(id)
 	return cached_fetch(id..":"..mapType, url, util.APICall.cooldowns.map, util.APICall.cache.maps and { ts = util.APICall.cache.maps.ts, data = util.APICall.cache.maps.data } or { ts = {}, data = {} }, opts.force, opts.fallback or util.APICall.cache.maps.fallback)
 end
-
 util.todelete = {}
 function util.addToDelete(message, timeToDelete)
 	local tim = (timeToDelete or 2.5) + os.time()

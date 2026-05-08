@@ -177,18 +177,5 @@ clock:on('min', function(now)
 	--print("Timer ticked")
 end)
 clock:start(false)
---[[do
-	for key, data in pairs(storage.entries) do
-		storage["1458073180013858858"] = storage["1458073180013858858"] or {}
-		storage["1458073180013858858"].upkeepEntries = storage["1458073180013858858"].upkeepEntries or {}
-		storage["1458073180013858858"].upkeepEntries[key] = data
-	end
-	for key, data in pairs(storage.savedSummary) do
-		storage["1458073180013858858"] = storage["1458073180013858858"] or {}
-		storage["1458073180013858858"].savedSummary = storage["1458073180013858858"].savedSummary or {}
-		storage["1458073180013858858"].savedSummary[key] = data
-	end
-	save()
-end--]]
 local BOT_TOKEN = require("privateStorage.bottoken")
 client:run("Bot "..BOT_TOKEN)

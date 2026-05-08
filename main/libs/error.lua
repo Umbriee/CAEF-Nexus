@@ -3,7 +3,7 @@ local discordia = nil
 local client = nil
 local logger = nil
 local save = nil
--- Don't like these. I hate multi file but I want to stay decently organized now.
+
 local errorHandler = {}
 
 local ERR_FUNNY_TITLE = {
