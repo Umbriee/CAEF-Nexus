@@ -118,7 +118,7 @@ client:on('messageCreate', function(message)
 				if entry.perms then
 					local success,needed = 0,#entry.perms
 					for key, data in pairs(entry.perms) do
-						if message.guild:getMember(message.author.id):hasPermission(data) and client:hasPermission(data) then success=success+1; end
+						if message.guild:getMember(message.author.id):hasPermission(data) and message.guild.me:hasPermission(data) then success=success+1; end
 					end
 					if success >= needed then can = true end
 				else can = true end
@@ -131,7 +131,7 @@ client:on('messageCreate', function(message)
 				if cmd == 'help' then
 					local payload = {
 						embed = {
-							title = "<:logoColonial64:1501481247128555631> "..client.username.." - Available Commands! <:logoWarden64:1501481249745928272>",
+							title = "<:logoColonial64:1501481247128555631> "..client.user.username.." - Available Commands! <:logoWarden64:1501481249745928272>",
 							description = "`[field]` is required, `<field>` is optional. These are _linear_, so to build up you need the _previous values_ in your input.\n-# You are free to suggest ideas to @umbreeee, they need more.~\n-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus) if you are curious about anything.",
 							fields = {},
 							color = discordia.Color.fromRGB(114, 137, 218).value,
