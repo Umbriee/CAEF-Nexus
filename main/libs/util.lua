@@ -318,7 +318,7 @@ end
 function util.buildStockpileEmbed(guildObj, data)
 	return {
 		embed = {
-			title = ("<:Orders:1501481297544220673> "..data.name.." - "..data.loc),
+			title = ("<:Orders:1501481297544220673> "..data.name.." | "..data.loc),
 			description = "Stockpile code: `"..data.code.."` expires in "..util.unixTimestamp(data.expireTime),
 			fields = {},
 			color = discordia.Color.fromRGB(94, 180, 121).value,
