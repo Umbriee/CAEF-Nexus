@@ -1,13 +1,17 @@
-local storage = nil
-local discordia = nil
-local client = nil
-local logger = nil
-local save = nil
-local http = nil
-local json = nil
--- Don't like these. I hate multi file but I want to stay decently organized now.
 local util = {}
 
+util.unix = {}
+util.unix.shortTime		= "t"
+util.unix.longTIme		= "T"
+util.unix.shortDate		= "d"
+util.unix.longDate		= "D"
+util.unix.shortDateTime	= "f"
+util.unix.longDateTime	= "F"
+util.unix.relative		= "R"
+function util.unixTimestamp(time,type) -- time takes in like os.time()
+	local txt = ("<t:"..(time or os.time())..":"..(type or util.unix.relative)..">")
+	return txt
+end
 function util.logInChannel(guildId, payload)
 	if not guildId or not payload then return end
 	local logChannel = storage[guildId].logChannel
@@ -27,15 +31,35 @@ function util.parseNumber(s)
 	if not num then return nil end
 	return num * mult
 end
-function util.parseRecipeTime(t)
-	if not t then return nil end
-	if t:find(':') then
-		local m,sec = t:match('^(%d+):(%d+)$')
-		if m and sec then return tonumber(m) + tonumber(sec)/60 end
-		return nil
-	else
-		return tonumber(t)
+function util.parseTime(s)
+	if not s then return nil end
+	local str = tostring(s):gsub('%s+',''):lower()
+	if str == '' then return nil end
+	-- 1) HH:MM or H:MM (colon) -> hours as number
+	local h, m = str:match('^(%d+):(%d+)$')
+	if h and m then
+		return tonumber(h) + tonumber(m) / 60
 	end
+	-- 2) Plain number (integer or decimal) -> treat as hours
+	if tonumber(str) then
+		return tonumber(str)
+	end
+	-- 3) Combined units like "2d1h30m", "90m", "2h", "2d1h"
+	-- Supported units: d (day = 24h), h (hour), m (minute)
+	local unit_values = { d = 24, h = 1, m = 1/60 }
+	local total = 0
+	local found = false
+	for num, unit in str:gmatch('(%d+%.?%d*)([dhm])') do
+		local n = tonumber(num)
+		if n and unit_values[unit] then
+			total = total + n * unit_values[unit]
+			found = true
+		else
+			return false
+		end
+	end
+	if found then return total end
+	return false
 end
 function util.formatShort(n)
 	if not n then return "N/A" end
@@ -228,7 +252,7 @@ function util.updateSummaryMessage(channel)
 			end
 			return false
 		end)
-		if ok then save(); return end
+		if ok then saveData(); return end
 	end
 	local target = channel
 	if not target then
@@ -238,7 +262,7 @@ function util.updateSummaryMessage(channel)
 	local sent = target:send(payload)
 	if sent then
 		storage[channel.guild.id].savedSummary = { channelId = target.id, messageId = sent.id }
-		save()
+		saveData()
 	end
 end
 function util.buildGoalEmbed(guildObj)
@@ -286,6 +310,52 @@ end
 function util.updateGoalEmbed(channelObj)
 	-- todo
 end
+util.timers = {}
+util.stockpileAlerts = {}
+function util.makeTimer(guildId,name,time)
+	
+end
+function util.buildStockpileEmbed(guildObj, data)
+	return {
+		embed = {
+			title = ("<:Orders:1501481297544220673> "..data.name.." - "..data.loc),
+			description = "Stockpile code: `"..data.code.."` expires in "..util.unixTimestamp(data.expireTime),
+			fields = {},
+			color = discordia.Color.fromRGB(94, 180, 121).value,
+			timestamp = discordia.Date():toISO('T','Z')
+		}
+	}
+end
+function util.updateStockpileEmbed(guildId, data)
+	if not storage[guildId].stockpileChannel then logger:log(2,"Tried to update a stockpile without a Stockpile Channel Cached") return end
+	local guild = client:getGuild(guildId)
+	local payload = util.buildStockpileEmbed(guild,data)
+	if guild then
+		local ch = guild:getChannel(storage[guildId].stockpileChannel.channelId)
+		if ch then
+			if data.messageId then
+				local msg = ch:getMessage(data.messageId)
+				if msg and msg.author == client.user then
+					msg:setContent(payload.content or "")
+					msg:setEmbed(payload.embed)
+					return true
+				else
+					local sent = ch:send(payload)
+					data.messageId = sent.id
+					storage[guildId].stockpiles[data.name:lower()] = data
+					saveData()
+					return (sent and true or false)
+				end
+			else
+				local sent = ch:send(payload)
+				data.messageId = sent.id
+				storage[guildId].stockpiles[data.name:lower()] = data
+				saveData()
+				return (sent and true or false)
+			end
+		end
+	end
+end
 function util.buildAPIEmbed()
 	local warapi = util.grabWarAPI()
 	local fields = {}
@@ -322,7 +392,7 @@ function util.updateAPIEmbed(channelObj)
 			end
 			return false
 		end)
-		if ok then save(); return end
+		if ok then saveData(); return end
 	end
 	local target = channelObj
 	if not target then
@@ -332,7 +402,7 @@ function util.updateAPIEmbed(channelObj)
 	local sent = target:send(payload)
 	if sent then
 		storage[channelObj.guild.id].savedAPI = { channelId = target.id, messageId = sent.id }
-		save()
+		saveData()
 	end
 end
 util.APICall = {
@@ -395,21 +465,10 @@ function util.grabWarMapAPI(mapIdOrName, mapType, opts)
 end
 util.todelete = {}
 function util.addToDelete(message, timeToDelete)
-	local tim = (timeToDelete or 2.5) + os.time()
+	local tim = (timeToDelete or 7.0) + os.time()
 	local data = {[1] = message, [2] = tim}
 	table.insert(util.todelete,data)
-	logger:log(3, 'Added message to delete table in '..(timeToDelete or 2.5)..'s')
-end
-
-function util.init(discordia_in, client_in, storage_in, logger_in, save_in, json_in, http_in)
-	discordia	= discordia_in
-	client		= client_in
-	storage		= storage_in
-	logger		= logger_in
-	save		= save_in
-	http		= http_in
-	json		= json_in
-	return util
+	logger:log(3, 'Added message to delete table in '..(timeToDelete or 7.0)..'s')
 end
 
 return util

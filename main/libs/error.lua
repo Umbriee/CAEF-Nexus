@@ -1,9 +1,3 @@
-local storage = nil
-local discordia = nil
-local client = nil
-local logger = nil
-local save = nil
-
 local errorHandler = {}
 
 local ERR_FUNNY_TITLE = {
@@ -176,13 +170,13 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 	if guild then
 		ch = guild:getChannel(channelGuild.CH)
 		if ch then
-			ch:send(payload)
+			util.addToDelete(ch:send(payload),10)
 			success = true
 		else
 			if guild2 then
 				ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 				if ch then
-					sent = ch:send(payload)
+					sent = util.addToDelete(ch:send(payload),10)
 					success = true
 				end
 			end
@@ -191,7 +185,7 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 		if guild2 then
 			ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 			if ch then
-				sent = ch:send(payload)
+				sent = util.addToDelete(ch:send(payload),10)
 				success = true
 			end
 		end
@@ -223,15 +217,6 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 		logger:log(2,"[WRN] - Could not find an error channel!")
 	end
 	return sent or false
-end
-
-function errorHandler.init(discordia_in, client_in, storage_in, logger_in, save_in)
-	discordia	= discordia_in
-	client		= client_in
-	storage		= storage_in
-	logger		= logger_in
-	save		= save_in
-	return errorHandler
 end
 
 return errorHandler

@@ -1,31 +1,29 @@
-local discordia = require('discordia')
-local http = require("coro-http")
-local client = discordia.Client()
-discordia.extensions()
-local Logger = discordia.Logger
-local logger = Logger(4, '%Y-%m-%d %H:%M:%S', nil)
-local Clock = discordia.Clock
-local clock = Clock()
-local Permissions = discordia.Permissions
-local permissions = Permissions()
-local json = require('json')
-local datafile = 'privateStorage/data.json'
-local prefix = "!"
+_G.http			= require("coro-http")
+_G.json			= require('json')
 
+_G.discordia		= require('discordia')
+discordia.extensions()
+_G.client			= discordia.Client()
+_G.logger			= discordia.Logger(4, '%Y-%m-%d %H:%M:%S', nil)
+_G.clock			= discordia.Clock()
+_G.permissions		= discordia.Permissions()
+_G.localSaveData	= 'privateStorage/data.json'
+-- I was told that _G is something not to use all that much.. Buut..
+
+commandPrefix = "!"
 local cooldown = os.time()
 local cooldownTime = 2.00
-local storage = { entries = {} }
-
-local function load()
-	local f=io.open(datafile,'r') if f then local c=f:read'*a';f:close(); local ok,t=pcall(json.decode,c) if ok and t then storage=t end end
+_G.storage = {}
+function _G.loadData()
+	local f=io.open(localSaveData,'r') if f then local c=f:read'*a';f:close(); local ok,t=pcall(json.decode,c) if ok and t then _G.storage=t end end
 end
-local function save() local f=io.open(datafile,'w') if f then f:write(json.encode(storage)); f:close() end end
-load()
+function _G.saveData() local f=io.open(localSaveData,'w') if f then f:write(json.encode(_G.storage)); f:close() end end
+loadData()
 
-local util = require("libs.util").init(discordia, client, storage, logger, save, json, http)
-util.errorHandler = require("libs.error").init(discordia, client, storage, logger, save)
-local errorHandle = util.errorHandler.errorHandle
-local commandRegistry = require("commands.commandRegistry").init(discordia, client, storage, logger, save, util)
+_G.util = require("libs.util")
+util.errorHandler = require("libs.error")
+errorHandle = util.errorHandler.errorHandle
+commandRegistry = require("commands.commandRegistry")
 client:on('reactionAddAny', function(channel, messageId, hash, userId)
 	if userId == client.user.id then return end
 	local guildStore = storage[channel.guild.id] or {}
@@ -103,13 +101,17 @@ local function parseArgsFromContent(content)
 	end
 	return args
 end
+client:enableIntents(discordia.enums.gatewayIntent.messageContent)
 client:on('messageCreate', function(message)
 	if message.author.bot then return end
-	if message.content:sub(1,1) ~= prefix then return end
+	if message.content:sub(1,1) ~= commandPrefix then return end
 	if not message.guild then message:reply("No guild found, assuming DM. Until I get more commands available in that field, nothing that I can do here.") return end
 	if cooldown < os.time() then
 		local ok, err = pcall(function()
-			logger:log(2,"Potential Command: ["..(message.guild and message.guild.name or "DM").."] "..message.author.username..":  "..message.content)
+			logger:log(4,"Potential Command: ["..(message.guild and message.guild.name or "DM").."] "..message.author.username..":  "..message.content)
+			if not storage[message.guild.id] then
+				storage[message.guild.id] = storage[message.guild.id] or {}
+			end
 			local args = parseArgsFromContent(message.content)
 			local cmd = (args[1] or ""):lower()
 			local entry = commandRegistry[cmd]
@@ -125,6 +127,7 @@ client:on('messageCreate', function(message)
 				if not can then
 					message:reply("Either I don't have current permissions for that command, or you don't!")
 				else
+					cooldown = os.time() + cooldownTime
 					entry.func(message, args)
 				end
 			else
@@ -140,18 +143,21 @@ client:on('messageCreate', function(message)
 					}
 					for key, data in pairs(commandRegistry) do
 						if data.helper then
-							local txt
+							local fields, perms
 							if data.fields then
-								txt = table.concat(data.fields,", ")
+								fields = table.concat(data.fields,", ")
 							end
-							table.insert(payload.embed.fields, {name = (data.name or tostring(key)), value = (("`"..prefix..data.helper.."`"..(txt and ("\n-# Expected Fields: "..txt) or "")) or "Umbree, add data here!"), inline = false})
+							if data.perms then
+								perms = table.concat(data.perms,", ")
+							end
+							table.insert(payload.embed.fields, {name = (data.name or tostring(key)), value = ("- Usage: `"..commandPrefix..data.helper.."`"..(fields and ("\n-# - Expected Fields: "..fields) or "")..(perms and ("\n-# - Needed Permissions: "..perms) or "")), inline = false})
 						end
 					end
-					message.channel:send(payload)
+					cooldown = os.time() + cooldownTime
+					util.addToDelete(message.channel:send(payload),120)
 					message:delete()
 				end
 			end
-			cooldown = os.time() + cooldownTime
 		end)
 		errorHandle({CH = message.channel.id, GD = (message.guild and message.guild.id or nil)}, {{name = "Latest Command", value = ("`"..message.content.."`")}}, ok, err)
 	else
@@ -171,10 +177,62 @@ client:on('ready', function()
 	--[[for key, data in pairs(perms:toTable()) do
 		print(tostring(key),tostring(data))
 	end--]]
+	logger:log(3, "Starting Garbage Data Collection...")
+	for key, data in pairs(storage) do
+		local guild = client:getGuild(key)
+		if guild then
+			logger:log(3,"Found Guild data for server: %s (%s)",guild.name,tostring(key))
+		else
+			logger:log(2,"Garbage Wandering Data found, %s %s",tostring(key),tostring(data))
+			storage[key] = nil
+		end
+	end
+	logger:log(3, "Run any command that saves data to confirm.")
+end)
+clock:on('sec', function(now)
+	if util.todelete and #util.todelete > 0 then
+		for key, data in pairs(util.todelete) do
+			local msg_obj, time = data[1], data[2]
+			if time > os.time() then 
+				-- continue
+			else
+				local guild = client:getGuild(msg_obj.guild.id)
+				local channel = guild and guild:getChannel(msg_obj.channel.id)
+				local msg = channel and channel:getMessage(msg_obj.id)
+				if msg then 
+					logger:log(3, 'Deleting garbage message..')
+					msg:delete()
+					util.todelete[key] = nil
+				end
+			end
+		end
+	end
 end)
 clock:on('min', function(now)
-	--[[if now.min % 3 == 0 then return end--]]
-	--print("Timer ticked")
+	for key, data in pairs(storage) do
+		local guild = client:getGuild(key)
+		if guild then
+			if data.stockpileChannel then
+				local ch = guild:getChannel(data.stockpileChannel.channelId)
+				if ch then
+					if data.stockpiles then
+						for key2, data2 in pairs(data.stockpiles) do
+							if data2.expireTime then
+								if (data2.expireTime - 3600) <= os.time() then
+									if not util.stockpileAlerts[key2] then
+										util.stockpileAlerts[key2] = true
+										ch:send("`[Alarm]` - Stockpile, "..data2.name.." in "..data2.loc..", is about to expire. "..util.unixTimestamp(data2.expireTime).."\n-# Use `!stockpile "..data2.name.." 2d1h` or whatever the time may be to refresh this.")
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		else
+			logger:log(3,"Unknown guild found '%s'",tostring(key))
+		end
+	end
 end)
 clock:start(false)
 local BOT_TOKEN = require("privateStorage.bottoken")
