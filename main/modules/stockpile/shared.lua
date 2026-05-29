@@ -14,6 +14,7 @@ m.commands["stockpile"] = {
 	func = function(message, args)
 		local guild = message.guild
 		if not guild then return end
+		if not args[2] then util.addToDelete(message:reply("Usage: !stockpile [name] [location or newly refreshed time] [code] <time remaining or 2d1h>")) message:delete() return end
 		local name, key = args[2],args[2]:lower()
 		local arg3 = args[3]
 		local arg4 = args[4]

@@ -8,37 +8,39 @@
 //  ▒███   ▒███  ▒███ ▒███ ▒███  ▒███ ▒███▒▒███     ███  ███    ▒███ //
 //  ▒▒████████   █████▒███ █████ ████████  ▒▒▒███████▒  ▒▒█████████  //
 //   ▒▒▒▒▒▒▒▒   ▒▒▒▒▒ ▒▒▒ ▒▒▒▒▒ ▒▒▒▒▒▒▒▒     ▒▒▒▒▒▒▒     ▒▒▒▒▒▒▒▒▒   //
-//      Umbree's Cool Discord Bot                                    //
-//          For use in modularity                                    //
+//      Umbree's Lua Discord Bot Handler | Version: Something.       //
+//                 For use in modularity | Copyright: I.. Dunno.     //
 ///////////////////////////////////////////////////////////////////////
 --]]
-	--==[ Preliminary Library Stuff ]==--
-_G.http				= require("coro-http")
-_G.json				= require("json")
-_G.fs				= require('fs')
-local timer			= require("timer")
-_G.discordia		= require("discordia")
-					discordia.extensions()
-_G.client			= discordia.Client()
-_G.logger			= discordia.Logger(4, "%Y-%m-%d %H:%M:%S", nil)
-_G.clock			= discordia.Clock()
-_G.permissions		= discordia.Permissions()
-_G.localSaveData	= "privateStorage/data.json"
-_G.BOT_MODULES		= "modules"
-_G.BOT_PREFIX		= "!"
-_G.BOT_STORAGE		= {}
-_G.BOT_COOL			= 2.00
-	--==[ Load Saved Funcs Data & load to memory ]==--
-function _G.loadData()
-	local f=io.open(localSaveData,'r') if f then local c=f:read'*a';f:close(); local ok,t=pcall(json.decode,c) if ok and t then _G.BOT_STORAGE=t end end
+global = _G
+	--==[ Bot Config ]==--
+global.BOT_SAVEDATA		= "privateStorage/data.json"
+global.BOT_MODULES		= "modules"
+global.BOT_PREFIX		= "!"
+global.BOT_COOL		= 2.00
+	--==[ Library Stuff ]==--
+global.http				= require("coro-http")
+global.json				= require("json")
+global.fs				= require('fs')
+global.timer			= require("timer")
+global.discordia		= require("discordia")
+						  discordia.extensions()
+global.client			= discordia.Client()
+global.logger			= discordia.Logger(4, "%Y-%m-%d %H:%M:%S", nil)
+global.clock			= discordia.Clock()
+global.permissions		= discordia.Permissions() -- unused? Maybe?
+	--==[ Global Vars ]==--
+global.BOT_STORAGE		= {}
+	--==[ Load Save'n'Load Funcs to global and load saved data to memory ]==--
+function global.loadData()
+	local f=io.open(BOT_SAVEDATA,'r') if f then local c=f:read'*a';f:close(); local ok,t=pcall(json.decode,c) if ok and t then global.BOT_STORAGE=t end end
 end
-function _G.saveData() local f=io.open(localSaveData,'w') if f then f:write(json.encode(_G.BOT_STORAGE)); f:close() end end
+function global.saveData() local f=io.open(BOT_SAVEDATA,'w') if f then f:write(json.encode(global.BOT_STORAGE)); f:close() end end
 loadData()
-	--==[ Load Locally made Libary ]==--
-_G.util = require("libs.util")
-util.errorHandler = require("libs.error")
+	--==[ Load Preliminary Library Utility Functions ]==--
+global.util			= require("libs.util")
+util.errorHandler	= require("libs.error")
 errorHandle = util.errorHandler.errorHandle
-
 	--==[ Load Modules ]==--
 moduleRegistry	= {}
 commandRegistry	= {}
@@ -110,12 +112,8 @@ local function runModuleEvent(eventStr,...)
 	end
 end
 	--==[ Discord Events RegisterYeh. ]==--
-client:on('reactionAddAny', function(channel, messageId, hash, userId)
-	runModuleEvent("reactionRemoveAny",channel, messageId, hash, userId)
-end)
-client:on('reactionRemoveAny', function(channel, messageId, hash, userId)
-	runModuleEvent("reactionRemoveAny",channel, messageId, hash, userId)
-end)
+client:on('reactionAddAny', function(...) runModuleEvent("reactionRemoveAny", ...) end)
+client:on('reactionRemoveAny', function(...) runModuleEvent("reactionRemoveAny", ...) end)
 local function parseArgsFromContent(content)
 	local s = content:sub(2)
 	local args = {}
@@ -149,99 +147,140 @@ local function parseArgsFromContent(content)
 end
 client:enableIntents(discordia.enums.gatewayIntent.messageContent)
 client:on('messageCreate', function(message)
+		--== Early returns for non-command messages ==--
 	if message.author.bot then return end
-	if message.content:sub(1,1) ~= BOT_PREFIX then return end
-	if not message.guild then message:reply("No guild found, assuming DM. Until I get more commands available in that field, nothing that I can do here.") return end
-	if (cooldown or 0) < os.time() then
-		local ok, err = pcall(function()
-			logger:log(4,"Potential Command: ["..(message.guild and message.guild.name or "DM").."] "..message.author.username..": "..message.content)
-			if not BOT_STORAGE[message.guild.id] then
-				BOT_STORAGE[message.guild.id] = BOT_STORAGE[message.guild.id] or {}
-			end
-			local args = parseArgsFromContent(message.content)
-			local cmd = (args[1] or ""):lower()
-			local entry = commandRegistry[cmd]
-			if entry and type(entry.func) == "function" then
-				local can = false
-				if entry.perms then
-					local success,needed = 0,#entry.perms
-					for key, data in pairs(entry.perms) do
-						if message.guild:getMember(message.author.id):hasPermission(data) and message.guild.me:hasPermission(data) then success=success+1; end
-					end
-					if success >= needed then can = true end
-				else can = true end
-				if not can then
-					message:reply("Either I don't have current permissions for that command, or you don't!")
-				else
-					cooldown = os.time() + BOT_COOL
-					entry.func(message, args)
-				end
-			else
-				if cmd == 'help' then
-					if not args[2] then
-						local payload = {
-							embed = {
-								title = "<:logoColonial64:1501481247128555631> "..client.user.username.." - Available Modules! <:logoWarden64:1501481249745928272>",
-								description = "Type `"..BOT_PREFIX.."help [module]` for more info!\n-# You are free to suggest ideas to @umbreeee, they always need more.~\n-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus) if you are curious about anything.\n-# Will delete message to keep channel clean "..util.timeTill(120),
-								fields = {},
-								color = discordia.Color.fromRGB(114, 137, 218).value,
-								timestamp = discordia.Date():toISO('T', 'Z')
-							}
-						}
-						for key, module in pairs(moduleRegistry) do
-							local int = 0
-							for _,_ in pairs(module.commands) do
-								int = int + 1
-							end
-							if ((int > 0) and (not module.module.hidehelp)) then
-								table.insert(payload.embed.fields, {name = ("`"..BOT_PREFIX.."help` `"..key.."`"), value = (module.module.name..", "..module.module.desc..(module.module.version and ("\n-# - Version "..module.module.version) or "")), inline = false})
-							end
-						end
-						util.addToDelete(message.channel:send(payload),120)
-					else
-						local module = args[2]:lower()
-						if not moduleRegistry[module] then
-							util.addToDelete(message:reply("Module "..module.." not found. Type `"..BOT_PREFIX.."help` for more info! Apologies!"))
-						else
-							local module = moduleRegistry[module]
-							if not module.module.hidehelp then	
-								local payload = {
-									embed = {
-										title = "<:logoColonial64:1501481247128555631> "..module.module.name.." - Available Commands! <:logoWarden64:1501481249745928272>",
-										description = '`[field]` is required, `<field>` is optional. These are _linear_, so to build up you need the _previous values_ in your input.\nYou can also include spaces in your command by sorrounding it in quotation marks "like so"\n-# Will delete message to clean channel '..util.timeTill(120),
-										fields = {},
-										color = discordia.Color.fromRGB(114, 137, 218).value,
-										timestamp = discordia.Date():toISO('T', 'Z')
-									}
-								}
-								for key, data in pairs(module.commands) do
-									if data.helper then
-										local fields, perms
-										if data.fields then
-											fields = table.concat(data.fields,", ")
-										end
-										if data.perms then
-											perms = table.concat(data.perms,", ")
-										end
-										table.insert(payload.embed.fields, {name = (data.name or tostring(key)), value = ("- Usage: `"..BOT_PREFIX..data.helper.."`"..(fields and ("\n-# - Expected Fields: "..fields) or "")..(perms and ("\n-# - Needed Permissions: "..perms) or "")), inline = false})
-									end
-								end
-								util.addToDelete(message.channel:send(payload),120)
-							end
-						end
-					end
-					message:delete()
-					cooldown = os.time() + BOT_COOL
-				end
-			end
-		end)
-		errorHandle({CH = message.channel.id, GD = (message.guild and message.guild.id or nil)}, {{name = "Latest Command", value = ("`"..message.content.."`")}}, ok, err)
-	else
-		util.addToDelete(message:reply("I'm sending too many requests too quickly!\n-# <Cooldown of "..BOT_COOL.." seconds per cmd.>"))
-		util.addToDelete(message,3)
+	if message.content:sub(1, 1) ~= BOT_PREFIX then return end
+	if not message.guild then
+		message:reply("No guild found, assuming this is a DM environment?\nUntil I get more commands available in that field, nothing that I can do here.\nSorry!")
+		return
 	end
-	runModuleEvent("messageCreate",message)
+		--== Cooldown check ==--
+	if (cooldown or 0) >= os.time() then
+		util.addToDelete(message:reply("I'm sending too many requests too quickly!\n-# - <Cooldown of "..BOT_COOL.." seconds per cmd.>"), 3)
+		util.addToDelete(message, 3)
+		return
+	end
+		--== Command processing ==--
+	local ok, err = pcall(function()
+		logger:log(4, ("Potential Command: [%s] %s: %s"):format(
+			message.guild and message.guild.name or "DM",
+			message.author.username,
+			message.content
+		))
+			--== Initialize guild storage if needed ==--
+		BOT_STORAGE[message.guild.id] = BOT_STORAGE[message.guild.id] or {}
+		local args = parseArgsFromContent(message.content)
+		local cmd = (args[1] or ""):lower()
+		local entry = commandRegistry[cmd]
+			--== Handle help command separately ==--
+		if cmd == 'help' then
+			handleHelpCommand(message, args)
+			cooldown = os.time() + BOT_COOL
+			return
+		end
+			--== Process regular commands ==--
+		if not entry or type(entry.func) ~= "function" then return end
+			--== Permission check ==--
+		local canExecute = true
+		if entry.perms then
+			local success, needed = 0, #entry.perms
+			for _, perm in pairs(entry.perms) do
+				if message.guild:getMember(message.author.id):hasPermission(perm) and
+				message.guild.me:hasPermission(perm) then
+					success = success + 1
+				end
+			end
+			canExecute = success >= needed
+		end
+		if not canExecute then
+			util.addToDelete(message:reply("Err, either you or I don't have enough permissions for that."))
+		else
+			cooldown = os.time() + BOT_COOL
+			entry.func(message, args)
+		end
+	end)
+	errorHandle(
+		{CH = message.channel.id, GD = (message.guild and message.guild.id or nil)},
+		{{name = "Latest Command", value = ("`%s`"):format(message.content)}},
+		ok, err
+	)
+	runModuleEvent("messageCreate", message)
 end)
+function handleHelpCommand(message, args)
+	if not args[2] then
+			--== Main help menu ==--
+		local payload = {
+			embed = {
+				title = "<:logoColonial64:1501481247128555631> "..client.user.username.." - Available Modules! <:logoWarden64:1501481249745928272>",
+				description = table.concat({
+					"Type `"..BOT_PREFIX.."help [module]` for more info!",
+					"-# You are free to suggest ideas to @umbreeee, they always need more.~",
+					"-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus) if you are curious about anything.",
+					"-# Will delete message to keep channel clean "..util.timeTill(120)
+				}, "\n"),
+				fields = {},
+				color = discordia.Color.fromRGB(114, 137, 218).value,
+				timestamp = discordia.Date():toISO('T', 'Z')
+			}
+		}
+		for key, module in pairs(moduleRegistry) do
+			local commandCount = 0
+			for _ in pairs(module.commands) do commandCount = commandCount + 1 end
+
+			if commandCount > 0 and not module.module.hidehelp then
+				table.insert(payload.embed.fields, {
+					name = ("`%shelp` `%s`"):format(BOT_PREFIX, key),
+					value = ("%s, %s%s"):format(
+						module.module.name,
+						module.module.desc,
+						module.module.version and ("\n-# - Version "..module.module.version) or ""
+					),
+					inline = false
+				})
+			end
+		end
+		util.addToDelete(message.channel:send(payload), 120)
+	else
+			--== Module-specific help ==--
+		local module = args[2]:lower()
+		if not moduleRegistry[module] then
+			util.addToDelete(message:reply(("Module %s not found. Type `%shelp` for more info! Apologies!"):format(
+				module, BOT_PREFIX
+			)), 120)
+			return
+		end
+		local moduleData = moduleRegistry[module]
+		if moduleData.module.hidehelp then return end
+		local payload = {
+			embed = {
+				title = "<:logoColonial64:1501481247128555631> "..moduleData.module.name.." - Available Commands! <:logoWarden64:1501481249745928272>",
+				description = table.concat({
+					'`[field]` is required, `<field>` is optional. These are _linear_, so to build up you need the _previous values_ in your input.',
+					'You can also include spaces in your command by sorrounding it in quotation marks "like so"',
+					"-# Will delete message to clean channel "..util.timeTill(120)
+				}, "\n"),
+				fields = {},
+				color = discordia.Color.fromRGB(114, 137, 218).value,
+				timestamp = discordia.Date():toISO('T', 'Z')
+			}
+		}
+		for key, data in pairs(moduleData.commands) do
+			if data.helper then
+				table.insert(payload.embed.fields, {
+					name = "`"..BOT_PREFIX..(data.name or tostring(key)).."`",
+					value = table.concat({
+						"- Usage: `"..BOT_PREFIX..data.helper.."`",
+						data.fields and ("-# - Expected Fields: "..table.concat(data.fields, ", ")) or "",
+						data.perms and ("-# - Needed Permissions: "..table.concat(data.perms, ", ")) or ""
+					}, "\n"),
+					inline = false
+				})
+			end
+		end
+		util.addToDelete(message.channel:send(payload), 120)
+	end
+	message:delete()
+end
 local pcall_old = pcall
 function pcall(func)
 	lasttrace = lasttrace or nil
@@ -250,26 +289,14 @@ function pcall(func)
 end
 client:on('ready', function(...)
 	logger:log(3, 'Bot started as %s in %s servers', client.user.username, #client.guilds)
-	local perms = permissions.all()
 	runModuleEvent("ready",...)
 end)
---[[logger:log(3, "Starting Garbage Data Collection...")
-	for key, data in pairs(BOT_STORAGE) do
-		local guild = client:getGuild(key)
-		if guild then
-			logger:log(3,"Found Guild data for server: %s (%s)",guild.name,tostring(key))
-		else
-			logger:log(2,"Garbage Wandering Data found, %s %s",tostring(key),tostring(data))
-			BOT_STORAGE[key] = nil
-		end
-	end
-	logger:log(3, "Run any command that saves data to confirm.")--]]
 clock:on('sec', function(now)
 	if util.todelete and #util.todelete > 0 then
 		for key, data in pairs(util.todelete) do
 			local msg_obj, time = data[1], data[2]
 			if time > os.time() then 
-				-- continue, but there is no continue func in this library
+				-- continue, if I had a function called CONTINUE. RAAGH
 			else
 				local guild = client:getGuild(msg_obj.guild.id)
 				local channel = guild and guild:getChannel(msg_obj.channel.id)
