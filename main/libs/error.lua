@@ -56,7 +56,7 @@ local ERR_FUNNY_SUBTITLE = {
 	"The birds collectively decided this is a feature.",
 	"A nest conflict forced rollback.",
 	"A bird mistook a coroutine for seeds.",
-	"A bird cached yesterday's thoughts in my storage.",
+	"A bird cached yesterday's thoughts in my BOT_STORAGE.",
 	"The birds tried to parallelize naps.",
 	"I built a sandcastle in memory to that function.",
 	"Feathers are tangled in the wires -- signal lost.",
