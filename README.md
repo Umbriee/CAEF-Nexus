@@ -1,65 +1,85 @@
-# Discordia
+# CAEF Nexus
+*A modular Discord bot handler for Foxhole, built on the Discordia API*
 
-**Discord API library written in Lua for the Luvit runtime environment**
+[![Discordia](https://img.shields.io/badge/Discordia-v3.0-blue)](https://github.com/SinisterRectus/Discordia)
+[![Lua](https://img.shields.io/badge/Lua-5.4-yellow)](https://www.lua.org/)
+[![Foxhole](https://img.shields.io/badge/Foxhole-Active-red)](https://www.foxholegame.com/)
 
-### Introduction
+---
 
-**[Discord](https://discord.com/)** is a freeware, multi-platform, voice and text client. It has a [documented RESTful API](https://discord.com/developers/docs/intro) that allows developers to make Discord bots for use on their servers.
+## 📌 Overview
+CAEF Nexus is a **Discord bot framework** designed specifically for **Foxhole** communities. It provides a **plug-and-play modular system** for managing in-game logistics, tracking resources, and facilitating communication between players.
 
-**[Luvit](https://luvit.io)** is an open-source, asynchronous I/O Lua runtime environment. It is a combination of [LuaJIT](http://luajit.com/) and [libuv](http://libuv.org/), layered with various libraries to provide server-side functionality similar to that of [Node.js](https://nodejs.org/en/), but with Lua instead of JavaScript. Luvit's companion package manager, lit, makes it easy to set up the Luvit runtime and its published libraries.
+Built on the **Discordia API**, CAEF Nexus offers:
+✅ **Real-time Foxhole API integration** (detailed info provided on war status)
+✅ **Resource tracking** (fuel, supplies, stockpiles)
+✅ **Role-based reaction systems** (quick role selection)
+✅ **Customizable goal tracking** (regiment progress, rare collection)
+✅ **Modular architecture** (easy to extend with new features)
 
-Discordia is a Lua wrapper for the official Discord API, and provides a high-level, object-oriented, event-driven interface for developing Discord bots. By using Lua's native coroutines, asynchronous HTTP and WebSocket communication is internally abstracted in a way that allows end-users to write blocking-style code without blocking I/O operations.
+---
 
-Join the [Discord API](https://discord.gg/NKM3XmF) server to discuss Discordia and other Discord libraries!
+## 🛠️ Features
+### 🔹 Core Modules
+| Module | Description |
+|--------|-------------|
+| **Supply Tracker** | Monitors Maintenance Supplies and generator fuel levels, giving an estimate to when they drop. |
+| **Stockpile Manager** | Tracks stockpile reserves and predicts time till they expire. |
+| **Role Reaction System** | Simplified role selection for general discord. |
+| **Goal Summaries** | Tracks regiment progress (e.g., track collectively how many rares mined). |
+| **Foxhole API Integration** | Fetches real-time war data provided. |
 
-Join the independent [Discordia](https://discord.gg/EzRYYDW) server for more!
+### 🔹 Additional Features
+- **Plug-and-play modules** (load on startup, share data seamlessly)
+- **Customizable alerts** (notifications for when stockpiles are about to expire)
+- **Modular architecture** (easy to add new features and commands with easy examples of organization)
+
+---
+
+## 🚀 Getting Started
+### Prerequisites
+- **Lua 5.2**
+- **Discordia v3.0+** (included)
 
 ### Installation
+1. Clone the repository:
+   ```sh
+   git clone https://github.com/Umbriee/CAEF-Nexus
+   cd CAEF-Nexus
+   ```
+2. Install dependencies (if any):
+   ```sh
+   luarocks install discordia
+   ```
+3. Configure `config.lua` with your Discord bot token and Foxhole API key.
+4. Run the bot:
+   ```sh
+   lua main.lua
+   ```
 
-- To install Luvit, visit https://luvit.io and follow the instructions provided for your platform.
-- To install Discordia, run `lit install SinisterRectus/discordia`
-- Run your bot script using, for example, `luvit bot.lua`
+---
 
-### Example
-
-```lua
-local discordia = require('discordia')
-local client = discordia.Client()
-
-client:on('ready', function()
-	print('Logged in as '.. client.user.username)
-end)
-
-client:on('messageCreate', function(message)
-	if message.content == '!ping' then
-		message.channel:send('Pong!')
-	end
-end)
-
-client:run('Bot INSERT_TOKEN_HERE')
+## 📂 Project Structure
+```
+CAEF-Nexus/main/
+├── modules/          # Modular components
+│   ├── module/       # module name, unique and lowerish case
+│   └─── shared.lua   # loads this file for info. Can include others per example 'upkeep' module.
+├── libs/             # Core libraries
+└── war.lua           # Entry point
 ```
 
-### Documentation
+---
 
-Please visit this project's [Wiki](https://github.com/SinisterRectus/Discordia/wiki) for documentation and tutorials.
+## 🤝 Contributing
+Contributions are welcome! Open an issue or submit a pull request.
 
-### History
+---
 
-The earliest version of Discordia, before it even had that name, was released as a [Just Cause 2 Multiplayer module](https://www.jc-mp.com/forums/index.php/topic,5936.0.html) on 7 March 2016. It utilized LuaSocket, LuaSec, and (eventually) Copas to provide basic REST functionality in a sandboxed Lua 5.2 environment. The goal was to bridge the game chat with a Discord client. Due to a lack of WSS support (at the time), the project was put on hold in favor of a general-purpose Lua library for Discord. After finishing a relatively stable version of Discordia, the JC2MP bridge was re-designed to connect with Discordia via inter-process communication.
+### 🔗 Links
+- [Discordia API](https://github.com/SinisterRectus/Discordia) (Core framework)
+- [Foxhole Game](https://www.foxholegame.com/) (Game this bot supports)
 
-### FAQs
+---
 
-Why Lua?
-- Lua is a lightweight scripting language that tends to be beginner-friendly, but powerful in the hands of an advanced user at the same time. Although Lua might not have the same popularity as that of other scripting languages such as Python or JavaScript, Lua's expandability makes it equally as capable as the others, while remaining easy-to-use and often more resource efficient.
-
-Why Luvit?
-- Luvit makes Lua web development an easy task on multiple platforms. Its [installation](https://luvit.io/install.html) process is (optionally) automated and uses pre-built [luvi cores](https://github.com/luvit/luvi/releases) when available. It also comes with many libraries essential to async I/O programming and networking. Compared to Node.js, Luvit [advertises](https://luvit.io/blog/luvit-reborn.html) similar speed, but reduced memory consumption. Compared to other Discord libraries, Discordia is expected to perform well due Luvit's use of LuaJIT, although it has not been benchmarked.
-
-Can I run this on a different Lua distribution?
-- The development and deployment of Discordia relies on the Luvit framework and its package manager. Porting Discordia and its dependencies to classic Lua or LuaJIT may be possible, but this is not a current project goal.
-
-How can I contribute?
-- Pull requests are welcomed, but please check with the library author before starting a major implementation. Contributions to the Wiki are helpful, too.
-
-Are there other Discord libraries?
-- Absolutely. Check the official [libraries](https://discord.com/developers/docs/topics/community-resources) page of the Discord API documentation or the unofficial Discord API server linked above.
+This version improves readability, adds structure, and makes it more appealing to potential contributors or users.
