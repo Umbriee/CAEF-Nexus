@@ -1,5 +1,6 @@
 # CAEF Nexus
-*A modular Discord bot handler for Foxhole, built on the Discordia API*
+#### "*Caoiva Avali Exploratory Fleet*"
+"*A modular Discord bot handler for Foxhole, built on the Discordia API*"
 
 [![Discordia](https://img.shields.io/badge/Discordia-v3.0-blue)](https://github.com/SinisterRectus/Discordia)
 [![Lua](https://img.shields.io/badge/Lua-5.4-yellow)](https://www.lua.org/)
@@ -8,9 +9,9 @@
 ---
 
 ## 📌 Overview
-CAEF Nexus is a **Discord bot framework** designed specifically for **Foxhole** communities. It provides a **plug-and-play modular system** for managing in-game logistics, tracking resources, and facilitating communication between players.
+CAEF Nexus is a **Discord Bot**(.. Or application?) designed specifically for our regiment group in the game **Foxhole**. It provides a **plug-and-play modular system** for managing in-game logistics, tracking resources, and facilitating communication between players.
 
-Built on the **Discordia API**, CAEF Nexus offers:
+Built on the **Discordia API**, CAEF-Nexus offers:
 ✅ **Real-time Foxhole API integration** (detailed info provided on war status)
 ✅ **Resource tracking** (fuel, supplies, stockpiles)
 ✅ **Role-based reaction systems** (quick role selection)
@@ -36,29 +37,6 @@ Built on the **Discordia API**, CAEF Nexus offers:
 
 ---
 
-## 🚀 Getting Started
-### Prerequisites
-- **Lua 5.2**
-- **Discordia v3.0+** (included)
-
-### Installation
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/Umbriee/CAEF-Nexus
-   cd CAEF-Nexus
-   ```
-2. Install dependencies (if any):
-   ```sh
-   luarocks install discordia
-   ```
-3. Configure `config.lua` with your Discord bot token and Foxhole API key.
-4. Run the bot:
-   ```sh
-   lua main.lua
-   ```
-
----
-
 ## 📂 Project Structure
 ```
 CAEF-Nexus/main/
@@ -78,8 +56,5 @@ Contributions are welcome! Open an issue or submit a pull request.
 
 ### 🔗 Links
 - [Discordia API](https://github.com/SinisterRectus/Discordia) (Core framework)
-- [Foxhole Game](https://www.foxholegame.com/) (Game this bot supports)
-
+- [Foxhole Game](https://www.foxholegame.com/)
 ---
-
-This version improves readability, adds structure, and makes it more appealing to potential contributors or users.
