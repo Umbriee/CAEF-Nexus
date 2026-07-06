@@ -154,7 +154,7 @@ function moduleutil.updateSummaryMessage(channel)
 	local payload = util.buildSummaryEmbed(channel.guild.id)
 	local saved = BOT_STORAGE[channel.guild.id].savedSummary or {}
 	if saved.messageId and saved.channelId then
-		local ok, err = pcall(function()
+		local ok, err = safeCall(function()
 			local ch = client:getChannel(saved.channelId)
 			if ch then
 				local msg = ch:getMessage(saved.messageId)

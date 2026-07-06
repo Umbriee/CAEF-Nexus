@@ -29,14 +29,45 @@ global.client			= discordia.Client()
 global.logger			= discordia.Logger(4, "%Y-%m-%d %H:%M:%S", nil)
 global.clock			= discordia.Clock()
 global.permissions		= discordia.Permissions() -- unused? Maybe?
+function global.safeCall(func)
+	local status, err = xpcall(func, debug.traceback)
+	return status, err
+end
 	--==[ Global Vars ]==--
 global.BOT_STORAGE		= {}
-	--==[ Load Save'n'Load Funcs to global and load saved data to memory ]==--
-function global.loadData()
-	local f=io.open(BOT_SAVEDATA,'r') if f then local c=f:read'*a';f:close(); local ok,t=pcall(json.decode,c) if ok and t then global.BOT_STORAGE=t end end
+function loadData()
+	if not BOT_SAVEDATA then
+		print("Error: BOT_SAVEDATA path not defined")
+		return
+	end
+
+	local f = io.open(BOT_SAVEDATA, 'r')
+	if not f then
+		print("No saved data found or unable to open file")
+		return
+	end
+
+	local content = f:read('*a')
+	f:close()
+
+	if not content or content == "" then
+		print("File is empty")
+		return
+	end
+
+	print("File content:", content) -- Debug: print raw content
+
+	local ok, t = safeCall(function() return json.decode(content) end)
+	if ok and t then
+		print("Data loaded successfully!")
+		global.BOT_STORAGE = t
+	else
+		print("Failed to decode JSON:", t)
+	end
 end
-function global.saveData() local f=io.open(BOT_SAVEDATA,'w') if f then f:write(json.encode(global.BOT_STORAGE)); f:close() end end
+function global.saveData() local f=io.open(global.BOT_SAVEDATA,'w') if f then f:write(json.encode(global.BOT_STORAGE)); f:close() end end
 loadData()
+
 	--==[ Load Preliminary Library Utility Functions ]==--
 global.util			= require("libs.util")
 util.errorHandler	= require("libs.error")
@@ -45,6 +76,8 @@ errorHandle = util.errorHandler.errorHandle
 moduleRegistry	= {}
 commandRegistry	= {}
 eventRegistry	= {}
+
+local handledEvents = {}
 local function loadModule(modulePath)
 	local sharedPath = modulePath .. "/shared.lua"
 	local file, err = io.open(sharedPath, "r")
@@ -59,7 +92,7 @@ local function loadModule(modulePath)
 		logger:log(1,"Error loading "..sharedPath.." | "..err)
 		return nil
 	end
-	local ok, module = pcall(chunk)
+	local ok, module = safeCall(chunk)
 	if not ok then
 		logger:log(1,"Error executing "..sharedPath.." | "..module)
 		return nil
@@ -67,7 +100,7 @@ local function loadModule(modulePath)
 	return module
 end
 fs.readdir(BOT_MODULES, function(err, potentialModules)
-	if err then error(err) return end
+	if err then logger:log(1,err) return end
 	for _, name in ipairs(potentialModules) do
 		local path = BOT_MODULES .. "/" .. name
 		local module = loadModule(path)
@@ -81,14 +114,14 @@ fs.readdir(BOT_MODULES, function(err, potentialModules)
 					if not commandRegistry[key] then
 						commandRegistry[cmd] = data
 					else
-						error("Trying to register a command with the same command as another! ", cmd)
+						logger:log(1,"["..name.."] - Trying to register a command with the same command as another! ".. (tostring(cmd) or tostring(data) or "ERR"))
 					end
 				end
 			end
 			if module.event then
-				for event, data in pairs(module.event) do
+				for event, func in pairs(module.event) do
 					if not eventRegistry[event] then eventRegistry[event] = {} end
-					table.insert(eventRegistry[event],{name = data})
+					table.insert(eventRegistry[event],{module = name, func = func})
 				end
 			end
 			if module.util then
@@ -96,7 +129,7 @@ fs.readdir(BOT_MODULES, function(err, potentialModules)
 					if not util[key] then
 						util[key] = data
 					else
-						error("Trying to register a utility var with the same key as another! ", key)
+						logger:log(1,"["..name.."] - Trying to register a utility var with the same key as another! ".. (tostring(key) or tostring(data) or "ERR"))
 					end
 				end
 			end
@@ -105,9 +138,9 @@ fs.readdir(BOT_MODULES, function(err, potentialModules)
 end)
 local function runModuleEvent(eventStr,...)
 	if not eventRegistry[eventStr] then return end
-	for _,events in pairs(eventRegistry[eventStr]) do
-		for _,event in pairs(events) do
-			event(...)
+	for _,event in pairs(eventRegistry[eventStr]) do
+		if event.func then
+			event.func(...)
 		end
 	end
 end
@@ -161,7 +194,7 @@ client:on('messageCreate', function(message)
 		return
 	end
 		--== Command processing ==--
-	local ok, err = pcall(function()
+	local ok, err = safeCall(function()
 		logger:log(4, ("Potential Command: [%s] %s: %s"):format(
 			message.guild and message.guild.name or "DM",
 			message.author.username,
@@ -281,29 +314,19 @@ function handleHelpCommand(message, args)
 	end
 	message:delete()
 end
-local pcall_old = pcall
-function pcall(func)
-	lasttrace = lasttrace or nil
-	local status, err = xpcall(func,debug.traceback)
-	return status, err
-end
-client:on('ready', function(...)
-	logger:log(3, 'Bot started as %s in %s servers', client.user.username, #client.guilds)
-	runModuleEvent("ready",...)
-end)
 clock:on('sec', function(now)
 	if util.todelete and #util.todelete > 0 then
 		for key, data in pairs(util.todelete) do
 			local msg_obj, time = data[1], data[2]
 			if time > os.time() then 
-				-- continue, if I had a function called CONTINUE. RAAGH
+				-- continue, if only I had a function called CONTINUE. RAAGH
 			else
 				local guild = client:getGuild(msg_obj.guild.id)
 				local channel = guild and guild:getChannel(msg_obj.channel.id)
 				local msg = channel and channel:getMessage(msg_obj.id)
 				if msg then 
 					logger:log(3, 'Deleting garbage message..')
-					pcall(msg:delete())
+					safeCall(msg:delete())
 					util.todelete[key] = nil
 				end
 			end
@@ -311,9 +334,35 @@ clock:on('sec', function(now)
 	end
 	runModuleEvent("sec",now)
 end)
-clock:on('min', function(now)
-	runModuleEvent("min",now)
+clock:on('min', function(now) runModuleEvent("min",now) end)
+handledEvents = {
+	["reactionAddAny"] = true,
+	["reactionRemoveAny"] = true,
+	["sec"] = true,
+	["min"] = true,
+	["messageCreate"] = true,
+	["ready"] = true
+}
+client:on('ready', function(...)
+	logger:log(3, 'Bot started as %s in %s servers', client.user.username, #client.guilds)
+	runModuleEvent("ready",...)
+	for event, eventDatum in pairs(eventRegistry) do
+		if not handledEvents[event] then
+			for key, datum in pairs(eventDatum) do
+				if key == "module" then
+					-- continue
+				elseif type(datum) == "table" then
+					logger:log(2,"Unhandled Event from module '"..datum.module.."' on '"..event..".' Adding to eventRegistry in full")
+					local func = function(...) runModuleEvent(event, ...) end
+					client:on(event, func)
+					handledEvents[event] = true
+				end
+			end
+		end
+	end
 end)
+--[[client:on('memberJoin', function(...) runModuleEvent("memberJoin", ...) end)
+client:on('memberLeave', function(...) runModuleEvent("memberLeave", ...) end)--]]
 clock:start(false)
 local BOT_TOKEN = require("privateStorage.bottoken")
 client:run("Bot "..BOT_TOKEN)

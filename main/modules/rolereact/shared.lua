@@ -56,7 +56,7 @@ m.commands["sendrole"] = {
 					}
 					saveData()
 					for emojiStr,_ in pairs(emojiMap) do
-						local ok,err = pcall(function() sent:addReaction(emojiStr) end)
+						local ok,err = safeCall(function() sent:addReaction(emojiStr) end)
 						if not ok then logger:log(2,"addReaction failed:", emojiStr, err) end
 					end
 				end
@@ -75,7 +75,7 @@ m.commands["rmvrole"] = {
 		local chTable = (guildStore.savedRoleSelect or {})[message.channel.id] or {}
 		for msgId,saved in pairs(chTable) do
 		if saved and saved.messageId then
-			local ok,err = pcall(function()
+			local ok,err = safeCall(function()
 			local ch = client:getChannel(saved.channelId)
 			if ch then
 				local msg = ch:getMessage(saved.messageId)
@@ -106,7 +106,7 @@ m.events['reactionAddAny'] = function(channel, messageId, hash, userId)
 	end
 	local member = channel.guild:getMember(userId)
 	if not member then return end
-	local ok,err = pcall(function() 
+	local ok,err = safeCall(function() 
 		local role
 		for _,rr in pairs(channel.guild.roles) do if rr.id == roleId then role = rr; break end end
 		logger:log(3,"[ReactionAdd: "..channel.guild.name.."] - Adding "..role.name.." to "..member.name)
@@ -129,7 +129,7 @@ m.events['reactionRemoveAny'] = function(channel, messageId, hash, userId)
 	end
 	local member = channel.guild:getMember(userId)
 	if not member then return end
-	local ok,err = pcall(function() 
+	local ok,err = safeCall(function() 
 		local role
 		for _,rr in pairs(channel.guild.roles) do if rr.id == roleId then role = rr; break end end
 		logger:log(3,"[ReactionAdd: "..channel.guild.name.."] - Removing "..role.name.." to "..member.name)

@@ -33,7 +33,7 @@ local function http_get(url)
 	local res, body = http.request("GET", url)
 	if not res then return nil, "HTTP request failed" end
 	if res.code ~= 200 then return nil, ("HTTP %d"):format(res.code) end
-	local ok, parsed = pcall(json.decode, body)
+	local ok, parsed = safeCall(json.decode, body)
 	if not ok then return nil, "JSON decode error: "..tostring(parsed) end
 	return parsed
 end
@@ -45,7 +45,7 @@ local function cached_fetch(key, url, cooldown, cache_table, forced, fallback)
 	if not forced and cache_table.data[key] and age < cooldown then
 		return cache_table.data[key]
 	end
-	local ok, res = pcall(http_get, url)
+	local ok, res = safeCall(http_get, url)
 	if ok and res then
 		cache_table.ts[key] = os.time()
 		cache_table.data[key] = res
@@ -77,7 +77,7 @@ function m.util.updateAPIEmbed(channelObj)
 	local payload = util.buildAPIEmbed()
 	local saved = BOT_STORAGE[channelObj.guild.id].savedAPI or {}
 	if saved.messageId and saved.channelId then
-		local ok, err = pcall(function()
+		local ok, err = safeCall(function()
 			local ch = client:getChannel(saved.channelId)
 			if ch then
 				local msg = ch:getMessage(saved.messageId)

@@ -43,7 +43,7 @@ m.events["min"] = function(now)
 	local guildObj
 	local channelObj
 	local txt
-	local ok, status = pcall(function() 
+	local ok, status = safeCall(function() 
 		for key, data in pairs(BOT_STORAGE) do
 			guildObj = client:getGuild(key)
 			if guildObj then

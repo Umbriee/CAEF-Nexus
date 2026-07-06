@@ -56,7 +56,7 @@ local ERR_FUNNY_SUBTITLE = {
 	"The birds collectively decided this is a feature.",
 	"A nest conflict forced rollback.",
 	"A bird mistook a coroutine for seeds.",
-	"A bird cached yesterday's thoughts in my BOT_STORAGE.",
+	"A bird cached yesterday's thoughts in my storage.",
 	"The birds tried to parallelize naps.",
 	"I built a sandcastle in memory to that function.",
 	"Feathers are tangled in the wires -- signal lost.",
@@ -107,9 +107,9 @@ local ERR_FUNNY_MSG = {
 	"We blessed the stacktrace with feathers. It did not improve.",
 	"The birds installed a patch. It's uh -- literally a patch of leaves now."
 }
+local ERR_DEFAULTCH, username = require("privateStorage.privateserver") -- {CH = "ChannelID", GD = "GuildID"}, sort of a backup for me incase it errors out in a funny way to let me know. Other than a console check. Also username because stacktrace sometimes reveals my username in the full path, I have smart working directories :)
 local function scrub(err)
 	if not err or type(err) ~= "string" then return err end
-	local username = 'evan' -- lmfao, hello y'all on my git.
 	local s = err
 	s = s:gsub("\\", "/")
 	s = s:gsub("(/[%w%-%._%+]+/[%w%-%._%+%/]*/[%w%-%._%+]+:%d+)", function(pathline)
@@ -133,8 +133,7 @@ local function scrub(err)
 		s = s:gsub(username:upper(), "../Nexuslua")
 	end
 	return s
-end 
-local ERR_DEFAULTCH = {CH = "584475744973881419", GD = "551552753961402388"}
+end
 function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...)
 	local sent
 	if status then return ... end
@@ -148,7 +147,7 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 	local payload = {
 		embed = {
 			title = ("[ERR] "..randomFunnyTitle),
-			description = randomFunnySubtitle,
+			description = randomFunnySubtitle.."\n-# - Auto-Delete in "..util.timeTill(60),
 			fields = {
 				{name = "Stacktrace", value = ("```yml\nError:\n"..(scrubbedErr or "NUL").."\n```"), inline = false},
 			},
@@ -170,13 +169,13 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 	if guild then
 		ch = guild:getChannel(channelGuild.CH)
 		if ch then
-			util.addToDelete(ch:send(payload),10)
+			util.addToDelete(ch:send(payload),60)
 			success = true
 		else
 			if guild2 then
 				ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 				if ch then
-					sent = util.addToDelete(ch:send(payload),10)
+					sent = util.addToDelete(ch:send(payload),60)
 					success = true
 				end
 			end
