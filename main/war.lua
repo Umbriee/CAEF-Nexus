@@ -55,7 +55,7 @@ function loadData()
 		return
 	end
 
-	print("File content:", content) -- Debug: print raw content
+	-- print("File content:", content) -- Debug: print raw content
 
 	local ok, t = safeCall(function() return json.decode(content) end)
 	if ok and t then
