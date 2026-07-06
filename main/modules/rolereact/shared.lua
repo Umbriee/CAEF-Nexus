@@ -1,7 +1,7 @@
 local m = {}
 m.module = {
 	name = "Role React",
-	desc = "Gives the ability for the bot to hand out roles based on",
+	desc = "Gives the ability for the bot to hand out roles automatically based on reacting to a message.",
 	version = "1.0"
 }
 m.commands = {}
