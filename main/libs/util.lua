@@ -98,7 +98,7 @@ function util:roundNumber(num, decimal)
 end
 function util:isfunction(var) return type(var) == 'function' end
 function util:ismessage(var) return getmetatable(var) == 'class Message' end
---==| Taken from: [gist](https://gist.github.com/marcotrosi/163b9e890e012c6a460a) Owned by marcotrosi, Last Updated May 25th, 2015.|==--
+--==| Taken from: [gist](https://gist.github.com/marcotrosi/163b9e890e012c6a460a) Owned by Marco Trosi, Last Updated May 25th, 2015.|==--
 function util:printTable(t, f)
 	local function printTableHelper(obj, cnt)
 		local cnt = cnt or 0
@@ -163,7 +163,7 @@ function util:editMTData()
 				self:addToQueue(mt.guild, time, function() mt:reply(content) end)
 			end
 			var.replydel = function(mt, content, time)
-				self:addToQueue(mt.guild, nil, function() self:addToDelete(mt:reply(content),time) end)
+				self:addToDelete(mt:reply(content),time)
 			end
 		else
 			logger:log(1,"[UTIL INIT] - Message class not found")
@@ -175,7 +175,16 @@ function util:editMTData()
 				self:addToQueue(mt.guild, time, function() local msg = mt:send(payload) if callback then callback(msg) end end)
 			end
 			var.senddel = function(mt, payload, time)
-				self:addToQueue(mt.guild, nil, function() self:addToDelete(mt:send(payload),time) end)
+				self:addToDelete(mt:send(payload),time)
+			end
+			var.getcachedmessage = function(mt, id)
+				local weakCache = mt.messages
+				if weakCache then
+					local msg = weakCache:find(function(obj) return obj.id == id end)
+					if msg then return msg else return false end
+				else
+					return false
+				end
 			end
 		else
 			logger:log(1,"[UTIL INIT] - GuildTextChannel class not found")
