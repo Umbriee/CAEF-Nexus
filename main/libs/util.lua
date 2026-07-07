@@ -98,6 +98,7 @@ function util:roundNumber(num, decimal)
 end
 function util:isfunction(var) return type(var) == 'function' end
 function util:ismessage(var) return getmetatable(var) == 'class Message' end
+--==| Taken from: [gist](https://gist.github.com/marcotrosi/163b9e890e012c6a460a) Owned by marcotrosi, Last Updated May 25th, 2015.|==--
 function util:printTable(t, f)
 	local function printTableHelper(obj, cnt)
 		local cnt = cnt or 0
