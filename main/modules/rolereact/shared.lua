@@ -38,15 +38,14 @@ m.commands["sendrole"] = {
 				end
 			end
 			if not err then
-				local sent = message.channel:send {
+				message.channel:sendq({
 					embed = {
 						title = "Role React",
 						fields = fields,
 						color = discordia.Color.fromRGB(114,137,218).value,
 						timestamp = discordia.Date():toISO('T','Z')
 					}
-				}
-				if not sent then else
+				}, function(sent)
 					guildStore.savedRoleSelect[sent.channel.id] = guildStore.savedRoleSelect[sent.channel.id] or {}
 					guildStore.savedRoleSelect[sent.channel.id][sent.id] = {
 						guildId = sent.guild.id,
@@ -56,10 +55,10 @@ m.commands["sendrole"] = {
 					}
 					saveData()
 					for emojiStr,_ in pairs(emojiMap) do
-						local ok,err = safeCall(function() sent:addReaction(emojiStr) end)
+						local ok,err = safeCall(function() util:addToQueue(guild, nil,function() sent:addReaction(emojiStr) end) end)
 						if not ok then logger:log(2,"addReaction failed:", emojiStr, err) end
 					end
-				end
+				end)
 			end
 		end
 		message:delete()
@@ -74,20 +73,20 @@ m.commands["rmvrole"] = {
 		local guildStore = BOT_STORAGE[message.guild.id]
 		local chTable = (guildStore.savedRoleSelect or {})[message.channel.id] or {}
 		for msgId,saved in pairs(chTable) do
-		if saved and saved.messageId then
-			local ok,err = safeCall(function()
-			local ch = client:getChannel(saved.channelId)
-			if ch then
-				local msg = ch:getMessage(saved.messageId)
-				if msg and msg.author == client.user then msg:delete() end
+			if saved and saved.messageId then
+				local ok,err = safeCall(function()
+					local ch = client:getChannel(saved.channelId)
+					if ch then
+						local msg = ch:getMessage(saved.messageId)
+						if msg and msg.author == client.user then util:addToDelete(msg) end
+					end
+				end)
+				if not ok then logger:log(2,"rmvrole error:", tostring(err)) end
+				chTable[msgId] = nil
 			end
-			end)
-			if not ok then logger:log(2,"rmvrole error:", tostring(err)) end
-			chTable[msgId] = nil
-		end
 		end
 		saveData()
-		message:delete()
+		util:addToDelete(message)
 	end
 }
 m.event = {}
@@ -107,10 +106,12 @@ m.event['reactionAddAny'] = function(channel, messageId, hash, userId)
 	local member = channel.guild:getMember(userId)
 	if not member then return end
 	local ok,err = safeCall(function() 
-		local role
-		for _,rr in pairs(channel.guild.roles) do if rr.id == roleId then role = rr; break end end
-		logger:log(3,"[ReactionAdd: "..channel.guild.name.."] - Adding "..role.name.." to "..member.name)
-		member:addRole(roleId) 
+		util:addToQueue(channel.guild, nil, function()
+			local role
+			for _,rr in pairs(channel.guild.roles) do if rr.id == roleId then role = rr; break end end
+			logger:log(3,"[ReactionAdd: "..channel.guild.name.."] - Adding '"..role.name.."' to "..member.name)
+			member:addRole(roleId)
+		end)
 	end)
 	if not ok then logger:log(2,"Role add error:", tostring(err)) end
 end
@@ -130,10 +131,12 @@ m.event['reactionRemoveAny'] = function(channel, messageId, hash, userId)
 	local member = channel.guild:getMember(userId)
 	if not member then return end
 	local ok,err = safeCall(function() 
-		local role
-		for _,rr in pairs(channel.guild.roles) do if rr.id == roleId then role = rr; break end end
-		logger:log(3,"[ReactionAdd: "..channel.guild.name.."] - Removing "..role.name.." to "..member.name)
-		member:removeRole(roleId)
+		util:addToQueue(channel.guild, nil, function()
+			local role
+			for _,rr in pairs(channel.guild.roles) do if rr.id == roleId then role = rr; break end end
+			logger:log(3,"[ReactionAdd: "..channel.guild.name.."] - Removing '"..role.name.."' to "..member.name)
+			member:removeRole(roleId)
+		end)
 	end)
 	if not ok then logger:log(2,"Role remove error:", tostring(err)) end
 end

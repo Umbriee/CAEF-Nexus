@@ -151,7 +151,7 @@ local function runModuleEvent(eventStr,...)
 	end
 end
 	--==[ Discord Events RegisterYeh. ]==--
-client:on('reactionAddAny', function(...) runModuleEvent("reactionRemoveAny", ...) end)
+client:on('reactionAddAny', function(...) runModuleEvent("reactionAddAny", ...) end)
 client:on('reactionRemoveAny', function(...) runModuleEvent("reactionRemoveAny", ...) end)
 local function parseArgsFromContent(content)
 	local s = content:sub(2)
@@ -195,7 +195,7 @@ client:on('messageCreate', function(message)
 	end
 		--== Command processing ==--
 	local ok, err = safeCall(function()
-		logger:log(4, ("Potential Command: [%s] %s: %s"):format(message.guild and message.guild.name or "DM",message.author.username,message.content))
+		logger:log(4, ("Potential Command: [%s] %s: %s"):format(message.guild and message.guild.name or "DM",message.author.name,message.content))
 			--== Initialize guild storage if needed ==--
 		BOT_STORAGE[message.guild.id] = BOT_STORAGE[message.guild.id] or {}
 		local args = parseArgsFromContent(message.content)
@@ -237,7 +237,7 @@ function handleHelpCommand(message, args)
 			--== Main help menu ==--
 		local payload = {
 			embed = {
-				title = "<:logoColonial64:1501481247128555631> "..client.user.username.." - Available Modules! <:logoWarden64:1501481249745928272>",
+				title = "<:logoColonial64:1501481247128555631> "..client.user.name.." - Available Modules! <:logoWarden64:1501481249745928272>",
 				description = table.concat({
 					"Type `"..BOT_PREFIX.."help [module]` for more info!",
 					"-# You are free to suggest ideas to @umbreeee, they always need more.~",
@@ -304,46 +304,43 @@ function handleHelpCommand(message, args)
 		end
 		message.channel:senddel(payload,120)
 	end
-	message:delete()
+	util:addToDelete(message)
 end
 clock:on('sec', function(now)
 	if util.todelete and next(util.todelete) then
 		for key, data in pairs(util.todelete) do
 			local msg_obj, time = data[1], data[2]
-			if time > os.time() then 
-				-- continue, if only I had a function called CONTINUE. RAAGH
-			else
-				-- logger:log(4, 'Deleting garbage message..')
+			if time < os.time() then 
+				logger:log(4, 'Deleting garbage message..')
 				local savedmsg = msg_obj
 				local guild = savedmsg.guild
 				util:addToQueue(savedmsg.guild.id, nil, function() 
 					local channel = guild and guild:getChannel(savedmsg.channel.id)
-					local msg = channel and channel:getMessage(savedmsg.id)
-					if msg then 
-						msg:delete() 
-						-- logger:log(4, 'Deleted garbage message')
-						util.todelete[key] = nil
+					if channel then
+						local msg = channel and channel:getcachedmessage(savedmsg.id)
+						if msg then
+							logger:log(4, 'Deleted garbage message')
+							msg:delete()
+						end
 					end
 				end)
+				util.todelete[key] = nil
 			end
 		end
 	end
 	if util.queue and next(util.queue) then
-		-- logger:log(4,"--Start--")
 		for guildId, guildQueue in pairs(util.queue) do
 			if not util.queuecool[guildId] then
 				util.queuecool[guildId] = os.time()-1
 			end
-			-- logger:log(4," -- "..guildId)
 			local queuedata = guildQueue[1]
 			if queuedata then
 				local time = queuedata[2]
 				local func = queuedata[1]
-				for ind = #guildQueue, 1, -1 do
-					-- logger:log(4,"   ["..ind.."] -"..time..", "..tostring(time - os.time())..", "..tostring(util.queuecool[guildId] - os.time()))
-				end
+				--[[for ind = #guildQueue, 1, -1 do
+					logger:log(4,"   ["..ind.."] -"..time..", "..tostring(time - os.time())..", "..tostring(util.queuecool[guildId] - os.time()))
+				end--]]
 				if time <= os.time() and (not util.queuecool[guildId] or util.queuecool[guildId] <= os.time()) then
-					-- logger:log(4,"    running funct.."..tostring(os.time()-time))
 					local ok, err = pcall(func)
 					table.remove(guildQueue, 1)
 					util.queuecool[guildId] = os.time() + BOT_WEBCOOL
@@ -358,7 +355,7 @@ clock:on('min', function(...)			runModuleEvent("min",			...) end)
 client:on('memberJoin', function(...)	runModuleEvent("memberJoin",	...) end)
 client:on('memberLeave', function(...)	runModuleEvent("memberLeave",	...) end)
 client:on('ready', function(...)
-	logger:log(3, 'Bot started as %s in %s servers', client.user.username, #client.guilds)
+	logger:log(3, 'Bot started as "%s" in %s servers', (client.user.username..'" / "'..client.user.name), #client.guilds)
 	runModuleEvent("ready",...)
 	for event, eventDatum in pairs(eventRegistry) do
 		if not handledEvents[event] then
