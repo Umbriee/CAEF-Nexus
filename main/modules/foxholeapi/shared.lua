@@ -78,16 +78,18 @@ function m.util.updateAPIEmbed(channelObj)
 	local saved = BOT_STORAGE[channelObj.guild.id].savedAPI or {}
 	if saved.messageId and saved.channelId then
 		local ok, err = safeCall(function()
-			local ch = client:getChannel(saved.channelId)
-			if ch then
-				local msg = ch:getMessage(saved.messageId)
-				if msg and msg.author == client.user then
-					msg:setContent(payload.content or "")
-					msg:setEmbed(payload.embed)
-					return true
+			local data = message
+			util:addToQueue(data.guild, nil, function()
+				local ch = client:getChannel(saved.channelId)
+				if ch then
+					local msg = ch:getMessage(saved.messageId)
+					if msg and msg.author == client.user then
+						msg:setContent(payload.content or "")
+						msg:setEmbed(payload.embed)
+					end
 				end
-			end
-			return false
+			end)
+			return true
 		end)
 		if ok then saveData(); return end
 	end
@@ -96,11 +98,10 @@ function m.util.updateAPIEmbed(channelObj)
 		if saved.channelId then target = client:getChannel(saved.channelId) end
 	end
 	if not target then return end
-	local sent = target:send(payload)
-	if sent then
+	target:sendq(payload,function(sent)
 		BOT_STORAGE[channelObj.guild.id].savedAPI = { channelId = target.id, messageId = sent.id }
 		saveData()
-	end
+	end)
 end
 function m.util.grabWarAPI(opts)
 	opts = opts or {}

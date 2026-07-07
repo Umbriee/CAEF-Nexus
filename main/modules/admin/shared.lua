@@ -2,7 +2,8 @@ local m = {}
 m.module = {
 	name	= "Admin",
 	desc	= "A bunch of utilities, admin commands, and otherwise automatic handling for CAEF specific operations.",
-	version	= "1.0"
+	version	= "1.0",
+	hidehelp = true
 }
 local current_file = string.gsub(debug.getinfo(1, "S").source,"/shared.lua","")
 m.commands	= require(current_file.."/commands")

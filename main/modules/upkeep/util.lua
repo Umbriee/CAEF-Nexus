@@ -25,12 +25,12 @@ function moduleutil.computeDerived(e, guildId)
 	--if e.time_h then e.time_h = math.floor(e.time_h*10)/10 end
 	for _,k in ipairs({'msupp12','msupp24','msupp48'}) do if e[k] then e[k]=math.floor(e[k]*10)/10 end end
 	if not e.isGenerator then
-		local txt = "Computing MSupp site: '"..e.name.."' with "..util.formatShort(sp).." in stockpile, and "..cons.."MSupps at an hourly rate."
-		util.logInChannel(guildId, txt)
+		local txt = "Computing MSupp site: '"..e.name.."' with "..util:formatShort(sp).." in stockpile, and "..cons.."MSupps at an hourly rate."
+		util:logInChannel(guildId, txt)
 		logger:log(3,txt)
 	else
-		local txt = "Computing Gen   Site: '"..e.name.."' with "..util.formatShort(sp).." in stockpile, with a call of "..rcalls.." every "..util.formatTime(rmins or -1).."."
-		util.logInChannel(guildId, txt)
+		local txt = "Computing Gen   Site: '"..e.name.."' with "..util:formatShort(sp).." in stockpile, with a call of "..rcalls.." every "..util:formatTime(rmins or -1).."."
+		util:logInChannel(guildId, txt)
 		logger:log(3,txt)
 	end
 end
@@ -96,7 +96,7 @@ function moduleutil.buildSummaryEmbed(guildId)
 	--==[ MSupps Spreadsheet ]==-- 
 	if #msupps > 0 then
 		table.insert(fields, { name = "Totals (Stockpile | MSupp [12, 24, 48])", value = string.format("`%s`  | `%s`, `%s`, `%s`",
-			util.formatShort(totals.m.stockpile), util.formatShort(totals.m.msupp12), util.formatShort(totals.m.msupp24), util.formatShort(totals.m.msupp48)), inline = false })
+			util:formatShort(totals.m.stockpile), util:formatShort(totals.m.msupp12), util:formatShort(totals.m.msupp24), util:formatShort(totals.m.msupp48)), inline = false })
 
 		local lowestUnixTimeM = lowestM.entry.unixTime or os.time()
 		local lines = {}
@@ -104,8 +104,8 @@ function moduleutil.buildSummaryEmbed(guildId)
 			local time = tonumber(e.time_h) or 0
 			local tcol = (time < 24) and ((time < 12) and "- ⚠" or "!") or "+"
 			table.insert(lines, string.format("%s %s, %s | >%sh |%sm/hr| %s, %s, %s", 
-				tcol, e.name, util.formatShort(tonumber(e.stockpile) or 0), tostring(util.roundNumber(e.time_h) or "N/A"), e.consumption, 
-					util.formatShort(tonumber(e.msupp12) or 0), util.formatShort(tonumber(e.msupp24) or 0), util.formatShort(tonumber(e.msupp48) or 0)))
+				tcol, e.name, util:formatShort(tonumber(e.stockpile) or 0), tostring(util:roundNumber(e.time_h) or "N/A"), e.consumption, 
+					util:formatShort(tonumber(e.msupp12) or 0), util:formatShort(tonumber(e.msupp24) or 0), util:formatShort(tonumber(e.msupp48) or 0)))
 		end
 		local lines2 = {}
 		for _,e in ipairs(msupps) do
@@ -118,16 +118,16 @@ function moduleutil.buildSummaryEmbed(guildId)
 	--==[ Generators Spreadsheet ]==--
 	if #gens > 0 then
 		table.insert(fields, { name = "Totals (Stockpile | Fuel [12, 24, 48])", value = string.format("`%s`  | `%s`, `%s`, `%s`",
-			util.formatShort(totals.g.stockpile), util.formatShort(totals.g.msupp12), util.formatShort(totals.g.msupp24), util.formatShort(totals.g.msupp48)), inline = false })
+			util:formatShort(totals.g.stockpile), util:formatShort(totals.g.msupp12), util:formatShort(totals.g.msupp24), util:formatShort(totals.g.msupp48)), inline = false })
 		local lowestUnixTimeG = lowestG.entry.unixTime or os.time()
 		local lines = {}
 		for _,e in ipairs(gens) do
 			local time = tonumber(e.time_h) or 0
 			local tcol = (time < 24) and ((time < 12) and "- ⚠" or "! ") or "+ "
 			table.insert(lines, string.format("%s %s, %s | >%sh |%sx%sm| %s, %s, %s",
-				tcol, e.name, util.formatShort(tonumber(e.stockpile) or 0), tostring(util.roundNumber(e.time_h) or "N/A"),
-					tostring(e.recipeCalls or "N/A"), util.formatTime(e.recipeMins or -1),
-						util.formatShort(tonumber(e.msupp12) or 0), util.formatShort(tonumber(e.msupp24) or 0), util.formatShort(tonumber(e.msupp48) or 0)))
+				tcol, e.name, util:formatShort(tonumber(e.stockpile) or 0), tostring(util:roundNumber(e.time_h) or "N/A"),
+					tostring(e.recipeCalls or "N/A"), util:formatTime(e.recipeMins or -1),
+						util:formatShort(tonumber(e.msupp12) or 0), util:formatShort(tonumber(e.msupp24) or 0), util:formatShort(tonumber(e.msupp48) or 0)))
 		end
 		local lines2 = {}
 		for _,e in ipairs(gens) do
@@ -155,15 +155,19 @@ function moduleutil.updateSummaryMessage(channel)
 	local saved = BOT_STORAGE[channel.guild.id].savedSummary or {}
 	if saved.messageId and saved.channelId then
 		local ok, err = safeCall(function()
-			local ch = client:getChannel(saved.channelId)
-			if ch then
-				local msg = ch:getMessage(saved.messageId)
-				if msg and msg.author == client.user then
-					msg:setContent(payload.content or "")
-					msg:setEmbed(payload.embed)
-					return true
+			local chnl = channel
+			util:addToQueue(chnl.guild, nil, function()
+				local ch = client:getChannel(saved.channelId)
+				if ch then
+					local msg = ch:getMessage(saved.messageId)
+					if msg and msg.author == client.user then
+						local data = msg
+						data:setContent(payload.content or "")
+						data:setEmbed(payload.embed)
+						return true
+					end
 				end
-			end
+			end)
 			return false
 		end)
 		if ok then saveData(); return end
@@ -173,10 +177,10 @@ function moduleutil.updateSummaryMessage(channel)
 		if saved.channelId then target = client:getChannel(saved.channelId) end
 	end
 	if not target then return end
-	local sent = target:send(payload)
-	if sent then
-		BOT_STORAGE[channel.guild.id].savedSummary = { channelId = target.id, messageId = sent.id }
+	local data = target
+	target:sendq(payload,function(sent)
+		BOT_STORAGE[channel.guild.id].savedSummary = { channelId = data.id, messageId = sent.id }
 		saveData()
-	end
+	end)
 end
 return moduleutil

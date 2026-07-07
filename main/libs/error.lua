@@ -140,14 +140,14 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 	if not channelGuild then channelGuild = ERR_DEFAULTCH elseif type(channelGuild) == 'table' then
 	if (not channelGuild.CH) and (not channelGuild.GD) then channelGuild = ERR_DEFAULTCH end end
 
-	logger:log(1,"[ERR] - "..err)
+	logger:log(1,err)
 	local scrubbedErr = scrub(err)
 	local randomFunnySubtitle = ERR_FUNNY_SUBTITLE[math.random(#ERR_FUNNY_SUBTITLE)] or "ERR_FUNNY_SUBTITLE ERR"
 	local randomFunnyTitle = ERR_FUNNY_TITLE[math.random(#ERR_FUNNY_TITLE)] or "ERR_FUNNY_TITLE ERR"
 	local payload = {
 		embed = {
 			title = ("[ERR] "..randomFunnyTitle),
-			description = randomFunnySubtitle.."\n-# - Auto-Delete in "..util.timeTill(60),
+			description = randomFunnySubtitle.."\n-# - Auto-Delete in "..util:timeTill(60),
 			fields = {
 				{name = "Stacktrace", value = ("```yml\nError:\n"..(scrubbedErr or "NUL").."\n```"), inline = false},
 			},
@@ -169,13 +169,13 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 	if guild then
 		ch = guild:getChannel(channelGuild.CH)
 		if ch then
-			util.addToDelete(ch:send(payload),60)
+			ch:senddel(payload,60)
 			success = true
 		else
 			if guild2 then
 				ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 				if ch then
-					sent = util.addToDelete(ch:send(payload),60)
+					sent = ch:senddel(payload,60)
 					success = true
 				end
 			end
@@ -184,7 +184,7 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 		if guild2 then
 			ch = guild2:getChannel(ERR_DEFAULTCH.CH)
 			if ch then
-				sent = util.addToDelete(ch:send(payload),10)
+				sent = ch:senddel(payload,10)
 				success = true
 			end
 		end
@@ -213,7 +213,7 @@ function errorHandler.errorHandle(channelGuild, additionalData, status, err, ...
 		end
 	end
 	if not success then
-		logger:log(2,"[WRN] - Could not find an error channel!")
+		logger:log(2,"Could not find an error channel!")
 	end
 	return sent or false
 end

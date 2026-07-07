@@ -24,7 +24,7 @@ m.commands["sendrole"] = {
 				i = i + 3
 			end
 		end
-		if #groups == 0 then util.addToDelete(message:reply("Usage: !sendrole <emoji> <display> <role> ..."),10); else
+		if #groups == 0 then message:replydel("Usage: !sendrole <emoji> <display> <role> ...",10); else
 			local fields, emojiMap = {}, {}
 			local err = false
 			for _,g in ipairs(groups) do
@@ -32,7 +32,7 @@ m.commands["sendrole"] = {
 				local role
 				for _,rr in pairs(message.guild.roles) do if rr.name:lower() == g.roleName:lower() then role = rr; break end end
 				if not role then 
-					util.addToDelete(message:reply("Role not found: "..g.roleName),10); err = true
+					message:replydel("Role not found: "..g.roleName,10); err = true
 				else
 					emojiMap[g.emoji] = role.id
 				end
@@ -90,8 +90,8 @@ m.commands["rmvrole"] = {
 		message:delete()
 	end
 }
-m.events = {}
-m.events['reactionAddAny'] = function(channel, messageId, hash, userId)
+m.event = {}
+m.event['reactionAddAny'] = function(channel, messageId, hash, userId)
 	if userId == client.user.id then return end
 	local guildStore = BOT_STORAGE[channel.guild.id] or {}
 	local chMap = guildStore.savedRoleSelect or {}
@@ -114,7 +114,7 @@ m.events['reactionAddAny'] = function(channel, messageId, hash, userId)
 	end)
 	if not ok then logger:log(2,"Role add error:", tostring(err)) end
 end
-m.events['reactionRemoveAny'] = function(channel, messageId, hash, userId)
+m.event['reactionRemoveAny'] = function(channel, messageId, hash, userId)
 	if userId == client.user.id then return end
 	local guildStore = BOT_STORAGE[channel.guild.id] or {}
 	local chMap = guildStore.savedRoleSelect or {}

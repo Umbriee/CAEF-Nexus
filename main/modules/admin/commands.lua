@@ -3,7 +3,7 @@ commands["addticket"] = {
 	cmd = "addticket",
 	helper = "addticket -- add an admin ticket to be handled. Use this if you have a problem you wish to privately discuss!",
 	func = function(message, args)
-		util.addToDelete(message:reply("This is a WIP module. To be more added! Uhh-- Dm someone I suppose."))
+		message:replydel("This is a WIP module. To be more added! Uhh-- Dm someone I suppose.")
 		message:delete()
 	end
 }
@@ -15,7 +15,7 @@ commands["markticketcategory"] = {
 		BOT_STORAGE[message.guild.id] = BOT_STORAGE[message.guild.id] or {}
 		BOT_STORAGE[message.guild.id].ticketCategory = BOT_STORAGE[message.guild.id].ticketCategory or {}
 		BOT_STORAGE[message.guild.id].ticketCategory = { channelId = message.channel.id, messageId = sent.id }
-		util.addToDelete(message:reply("Marked category as a ticket category!"))
+		message:replydel("Marked category as a ticket category!")
 		saveData()
 		message:delete()
 	end

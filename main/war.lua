@@ -17,7 +17,7 @@ global = _G
 global.BOT_SAVEDATA		= "privateStorage/data.json"
 global.BOT_MODULES		= "modules"
 global.BOT_PREFIX		= "!"
-global.BOT_COOL		= 2.00
+global.BOT_WEBCOOL		= 2.00
 	--==[ Library Stuff ]==--
 global.http				= require("coro-http")
 global.json				= require("json")
@@ -26,13 +26,11 @@ global.timer			= require("timer")
 global.discordia		= require("discordia")
 						  discordia.extensions()
 global.client			= discordia.Client()
+global.class			= discordia.class
 global.logger			= discordia.Logger(4, "%Y-%m-%d %H:%M:%S", nil)
 global.clock			= discordia.Clock()
 global.permissions		= discordia.Permissions() -- unused? Maybe?
-function global.safeCall(func)
-	local status, err = xpcall(func, debug.traceback)
-	return status, err
-end
+function global.safeCall(func) local status, err = xpcall(func, debug.traceback); return status, err end
 	--==[ Global Vars ]==--
 global.BOT_STORAGE		= {}
 function loadData()
@@ -71,13 +69,23 @@ loadData()
 	--==[ Load Preliminary Library Utility Functions ]==--
 global.util			= require("libs.util")
 util.errorHandler	= require("libs.error")
-errorHandle = util.errorHandler.errorHandle
+global.errorHandle = util.errorHandler.errorHandle
+util:Init()
 	--==[ Load Modules ]==--
 moduleRegistry	= {}
 commandRegistry	= {}
 eventRegistry	= {}
 
-local handledEvents = {}
+local handledEvents = {
+	["reactionAddAny"]		= true,
+	["reactionRemoveAny"]	= true,
+	["sec"]					= true,
+	["min"]					= true,
+	["memberJoin"]			= true,
+	["memberLeave"]			= true,
+	["messageCreate"]		= true,
+	["ready"]				= true
+}
 local function loadModule(modulePath)
 	local sharedPath = modulePath .. "/shared.lua"
 	local file, err = io.open(sharedPath, "r")
@@ -106,9 +114,7 @@ fs.readdir(BOT_MODULES, function(err, potentialModules)
 		local module = loadModule(path)
 		if module then
 			moduleRegistry[name] = module
-			if module.init then
-				module.init()
-			end
+			if module.init and util:isfunction(module.init) then module.init() end
 			if module.commands then
 				for cmd, data in pairs(module.commands) do
 					if not commandRegistry[key] then
@@ -118,8 +124,9 @@ fs.readdir(BOT_MODULES, function(err, potentialModules)
 					end
 				end
 			end
-			if module.event then
-				for event, func in pairs(module.event) do
+			local event = module.event or module.events
+			if event then
+				for event, func in pairs(event) do
 					if not eventRegistry[event] then eventRegistry[event] = {} end
 					table.insert(eventRegistry[event],{module = name, func = func})
 				end
@@ -139,9 +146,8 @@ end)
 local function runModuleEvent(eventStr,...)
 	if not eventRegistry[eventStr] then return end
 	for _,event in pairs(eventRegistry[eventStr]) do
-		if event.func then
-			event.func(...)
-		end
+		local func,module = event.func, event.module
+		if func and util:isfunction(func) then func(...) end
 	end
 end
 	--==[ Discord Events RegisterYeh. ]==--
@@ -184,22 +190,12 @@ client:on('messageCreate', function(message)
 	if message.author.bot then return end
 	if message.content:sub(1, 1) ~= BOT_PREFIX then return end
 	if not message.guild then
-		message:reply("No guild found, assuming this is a DM environment?\nUntil I get more commands available in that field, nothing that I can do here.\nSorry!")
-		return
-	end
-		--== Cooldown check ==--
-	if (cooldown or 0) >= os.time() then
-		util.addToDelete(message:reply("I'm sending too many requests too quickly!\n-# - <Cooldown of "..BOT_COOL.." seconds per cmd.>"), 3)
-		util.addToDelete(message, 3)
+		message:replyq("No guild found, assuming this is a DM environment?\nUntil I get more commands available in that field, nothing that I can do here.\nSorry!")
 		return
 	end
 		--== Command processing ==--
 	local ok, err = safeCall(function()
-		logger:log(4, ("Potential Command: [%s] %s: %s"):format(
-			message.guild and message.guild.name or "DM",
-			message.author.username,
-			message.content
-		))
+		logger:log(4, ("Potential Command: [%s] %s: %s"):format(message.guild and message.guild.name or "DM",message.author.username,message.content))
 			--== Initialize guild storage if needed ==--
 		BOT_STORAGE[message.guild.id] = BOT_STORAGE[message.guild.id] or {}
 		local args = parseArgsFromContent(message.content)
@@ -208,7 +204,6 @@ client:on('messageCreate', function(message)
 			--== Handle help command separately ==--
 		if cmd == 'help' then
 			handleHelpCommand(message, args)
-			cooldown = os.time() + BOT_COOL
 			return
 		end
 			--== Process regular commands ==--
@@ -226,17 +221,15 @@ client:on('messageCreate', function(message)
 			canExecute = success >= needed
 		end
 		if not canExecute then
-			util.addToDelete(message:reply("Err, either you or I don't have enough permissions for that."))
+			message:replydel("Err, either you or I don't have enough permissions for that.")
 		else
-			cooldown = os.time() + BOT_COOL
 			entry.func(message, args)
 		end
 	end)
 	errorHandle(
-		{CH = message.channel.id, GD = (message.guild and message.guild.id or nil)},
-		{{name = "Latest Command", value = ("`%s`"):format(message.content)}},
-		ok, err
-	)
+	{CH = message.channel.id, GD = (message.guild and message.guild.id or nil)},
+	{{name = "Latest Command", value = ("`%s`"):format(message.content)}},
+	ok, err)
 	runModuleEvent("messageCreate", message)
 end)
 function handleHelpCommand(message, args)
@@ -249,7 +242,7 @@ function handleHelpCommand(message, args)
 					"Type `"..BOT_PREFIX.."help [module]` for more info!",
 					"-# You are free to suggest ideas to @umbreeee, they always need more.~",
 					"-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus) if you are curious about anything.",
-					"-# Will delete message to keep channel clean "..util.timeTill(120)
+					"-# Will delete message to keep channel clean "..util:timeTill(120)
 				}, "\n"),
 				fields = {},
 				color = discordia.Color.fromRGB(114, 137, 218).value,
@@ -272,14 +265,13 @@ function handleHelpCommand(message, args)
 				})
 			end
 		end
-		util.addToDelete(message.channel:send(payload), 120)
+		message.channel:senddel(payload,120)
 	else
 			--== Module-specific help ==--
 		local module = args[2]:lower()
 		if not moduleRegistry[module] then
-			util.addToDelete(message:reply(("Module %s not found. Type `%shelp` for more info! Apologies!"):format(
-				module, BOT_PREFIX
-			)), 120)
+			message:replydel(("Module `%s` not found. Type `%shelp` for more info! Apologies!"):format(module, BOT_PREFIX))
+			util:addToDelete(message)
 			return
 		end
 		local moduleData = moduleRegistry[module]
@@ -290,7 +282,7 @@ function handleHelpCommand(message, args)
 				description = table.concat({
 					'`[field]` is required, `<field>` is optional. These are _linear_, so to build up you need the _previous values_ in your input.',
 					'You can also include spaces in your command by sorrounding it in quotation marks "like so"',
-					"-# Will delete message to clean channel "..util.timeTill(120)
+					"-# Will delete message to clean channel "..util:timeTill(120)
 				}, "\n"),
 				fields = {},
 				color = discordia.Color.fromRGB(114, 137, 218).value,
@@ -310,39 +302,61 @@ function handleHelpCommand(message, args)
 				})
 			end
 		end
-		util.addToDelete(message.channel:send(payload), 120)
+		message.channel:senddel(payload,120)
 	end
 	message:delete()
 end
 clock:on('sec', function(now)
-	if util.todelete and #util.todelete > 0 then
+	if util.todelete and next(util.todelete) then
 		for key, data in pairs(util.todelete) do
 			local msg_obj, time = data[1], data[2]
 			if time > os.time() then 
 				-- continue, if only I had a function called CONTINUE. RAAGH
 			else
-				local guild = client:getGuild(msg_obj.guild.id)
-				local channel = guild and guild:getChannel(msg_obj.channel.id)
-				local msg = channel and channel:getMessage(msg_obj.id)
-				if msg then 
-					logger:log(3, 'Deleting garbage message..')
-					safeCall(msg:delete())
-					util.todelete[key] = nil
+				logger:log(3, 'Deleting garbage message..')
+				local savedmsg = msg_obj
+				local guild = savedmsg.guild
+				util:addToQueue(savedmsg.guild.id, nil, function() 
+					local channel = guild and guild:getChannel(savedmsg.channel.id)
+					local msg = channel and channel:getMessage(savedmsg.id)
+					if msg then 
+						msg:delete() 
+						logger:log(3, 'Deleted garbage message')
+						util.todelete[key] = nil
+					end
+				end)
+			end
+		end
+	end
+	if util.queue and next(util.queue) then
+		-- logger:log(4,"--Start--")
+		for guildId, guildQueue in pairs(util.queue) do
+			if not util.queuecool[guildId] then
+				util.queuecool[guildId] = os.time()-1
+			end
+			-- logger:log(4," -- "..guildId)
+			local queuedata = guildQueue[1]
+			if queuedata then
+				local time = queuedata[2]
+				local func = queuedata[1]
+				for ind = #guildQueue, 1, -1 do
+					-- logger:log(4,"   ["..ind.."] -"..time..", "..tostring(time - os.time())..", "..tostring(util.queuecool[guildId] - os.time()))
+				end
+				if time <= os.time() and (not util.queuecool[guildId] or util.queuecool[guildId] <= os.time()) then
+					-- logger:log(4,"    running funct.."..tostring(os.time()-time))
+					local ok, err = pcall(func)
+					table.remove(guildQueue, 1)
+					util.queuecool[guildId] = os.time() + BOT_WEBCOOL
+					errorHandle(nil,{{name = "Guild Queue Error", value = "Error in guild: '"..guildId.."'"}},ok, err)
 				end
 			end
 		end
 	end
 	runModuleEvent("sec",now)
 end)
-clock:on('min', function(now) runModuleEvent("min",now) end)
-handledEvents = {
-	["reactionAddAny"] = true,
-	["reactionRemoveAny"] = true,
-	["sec"] = true,
-	["min"] = true,
-	["messageCreate"] = true,
-	["ready"] = true
-}
+clock:on('min', function(...)			runModuleEvent("min",			...) end)
+client:on('memberJoin', function(...)	runModuleEvent("memberJoin",	...) end)
+client:on('memberLeave', function(...)	runModuleEvent("memberLeave",	...) end)
 client:on('ready', function(...)
 	logger:log(3, 'Bot started as %s in %s servers', client.user.username, #client.guilds)
 	runModuleEvent("ready",...)
@@ -352,7 +366,7 @@ client:on('ready', function(...)
 				if key == "module" then
 					-- continue
 				elseif type(datum) == "table" then
-					logger:log(2,"Unhandled Event from module '"..datum.module.."' on '"..event..".' Adding to eventRegistry in full")
+					logger:log(2,"Unhandled event from module '"..datum.module.."' on '"..event..".' Adding to eventRegistry in full")
 					local func = function(...) runModuleEvent(event, ...) end
 					client:on(event, func)
 					handledEvents[event] = true
@@ -361,8 +375,6 @@ client:on('ready', function(...)
 		end
 	end
 end)
---[[client:on('memberJoin', function(...) runModuleEvent("memberJoin", ...) end)
-client:on('memberLeave', function(...) runModuleEvent("memberLeave", ...) end)--]]
 clock:start(false)
 local BOT_TOKEN = require("privateStorage.bottoken")
 client:run("Bot "..BOT_TOKEN)

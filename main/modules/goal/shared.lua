@@ -12,7 +12,7 @@ m.commands["goalcreate"] = {
 	func = function(message, args)
 		local name = args[2]
 		if not name then 
-			util.addToDelete(message:reply("Usage: !goalcreate [Name] [goalammount] <Current?>"));  
+			message:replydel("Usage: !goalcreate [Name] [goalammount] <Current?>")
 		else
 			BOT_STORAGE[message.guild.id].goals = BOT_STORAGE[message.guild.id].goals or {}
 			if not BOT_STORAGE[message.guild.id].goals[name] then
@@ -20,14 +20,14 @@ m.commands["goalcreate"] = {
 				BOT_STORAGE[message.guild.id].goals = BOT_STORAGE[message.guild.id].goals or {}
 				BOT_STORAGE[message.guild.id].goals[name] = {
 					name = name,
-					value = util.parseNumber(args[4]) or 0,
-					goal = util.parseNumber(args[3]) or 0,
+					value = util:parseNumber(args[4]) or 0,
+					goal = util:parseNumber(args[3]) or 0,
 					subgoals = {}
 				}
 				saveData()
-				message:reply("New goal created! Do `!goal show` to build / update the summary!");
+				message:replyq("New goal created! Do `!goal show` to build / update the summary!")
 			else
-				message:reply("`[Err]` - goal already exists?");
+				message:replyq("goal already exists?")
 			end
 		end
 	end
@@ -39,21 +39,21 @@ m.commands["goalremove"] = {
 	func = function(message, args)
 		local name = args[2]
 		if not name then
-			util.addToDelete(message:reply("Usage: !goalremove [All or name]"),10)
+			message:replydel("Usage: !goalremove [All or name]",10)
 		else 
 			if name == 'all' then
 				if not BOT_STORAGE[message.guild.id].goals then
-					util.addToDelete(message:reply("`[Err]` - no goals exists on server?"));
+					message:replydel("No goals exists on server?")
 				else
 					BOT_STORAGE[message.guild.id].goalsSummary = BOT_STORAGE[message.guild.id].goalsSummary or {}
 					if not BOT_STORAGE[message.guild.id].goalsSummary then
-						util.addToDelete(message:reply("`[Err]` - no goals exists on server?"));
+						message:replydel("No goals exists on server?")
 					else
 						local ch = client:getChannel(BOT_STORAGE[message.guild.id].goalsSummary.channelId)
 						if ch then
 							local msg = ch:getMessage(BOT_STORAGE[message.guild.id].goalsSummary.messageId)
 							if msg then
-								msg:delete()
+								util:addToDelete(msg)
 								BOT_STORAGE[message.guild.id].goalsSummary = {}
 								saveData()
 							else
@@ -69,19 +69,19 @@ m.commands["goalremove"] = {
 			else
 				local entry; for key,g in pairs(BOT_STORAGE[message.guild.id].goals) do; if (g.name:lower() or "") == name:lower() then; entry = key; break; end end
 				if not entry then
-					util.addToDelete(message:reply("`[Err]` - goal, '"..name.."', doesn't exist?"))
+					message:replydel("Goal, '"..name.."', doesn't exist?")
 				else
 					if BOT_STORAGE[message.guild.id].goals[entry] then
 						BOT_STORAGE[message.guild.id].goals[entry] = nil
 						saveData()
 					else
-						util.addToDelete(message:reply("`[Err]` - goal, '"..name.."', doesn't exist?"))
+						message:replydel("Goal, '"..name.."', doesn't exist?")
 					end
 					saveData()
 				end
 			end
 		end
-		message:delete()
+		util:addToDelete(message)
 	end
 }
 m.commands["goal"] = {
@@ -91,99 +91,110 @@ m.commands["goal"] = {
 	func = function(message, args)
 		local name = args[2]
 		if not name then 
-			util.addToDelete(message:reply("Usage: !goal [name] [current, (Appending '#' will set, otherwise will add/subtract)] <goalammount?>"));
+			message:replydel("Usage: !goal [name] [current, (Appending '#' will set, otherwise will add/subtract)] <goalammount?>")
 		else 
 			if name == 'show' then
 				if not BOT_STORAGE[message.guild.id].goals then
-					util.addToDelete(message:reply("`[Err]` - no goals exists on server? Do `!goalcreate` for more info"));
+					message:replydel("no goals exists on server? Do `!goalcreate` for more info")
 				else
 					BOT_STORAGE[message.guild.id].goalsSummary = BOT_STORAGE[message.guild.id].goalsSummary or {}
 					if not BOT_STORAGE[message.guild.id].goalsSummary then
 						local payload = util.buildGoalEmbed(message.guild)
-						local msg = message.channel:send(payload)
-						BOT_STORAGE[message.guild.id].goalsSummary = {
-							channelId = message.channel.id,
-							messageId = msg.id,
-							nonce = msg.nonce
-						}
-						saveData()
+						local data = message
+						message.channel:sendq(payload,function(msg)
+							BOT_STORAGE[data.guild.id].goalsSummary = {
+								channelId = data.channel.id,
+								messageId = msg.id,
+								nonce = msg.nonce
+							}
+							saveData()
+						end)
 					else
 						local ch = client:getChannel(BOT_STORAGE[message.guild.id].goalsSummary.channelId)
 						if ch then
 							local msg = ch:getMessage(BOT_STORAGE[message.guild.id].goalsSummary.messageId)
 							if msg then
-								msg:delete()
+								util:addToDelete(msg)
 								local payload = util.buildGoalEmbed(message.guild)
-								local msg = message.channel:send(payload)
-								BOT_STORAGE[message.guild.id].goalsSummary = {
-									channelId = msg.channel.id,
-									messageId = msg.id,
-									nonce = msg.nonce
-								}
+								local data = message
+								message.channel:sendq(payload,function(msg)
+									BOT_STORAGE[data.guild.id].goalsSummary = {
+										channelId = msg.channel.id,
+										messageId = msg.id,
+										nonce = msg.nonce
+									}
+								end)
 							else
 								local payload = util.buildGoalEmbed(message.guild)
-								local msg = message.channel:send(payload)
+								local data = message
+								message.channel:sendq(payload, function(msg)
+									BOT_STORAGE[data.guild.id].goalsSummary = {
+										channelId = message.channel.id,
+										messageId = msg.id,
+										nonce = msg.nonce
+									}
+									saveData()
+								end)
+							end
+						else
+							local payload = util.buildGoalEmbed(message.guild)
+							local data = message
+							message.channel:sendq(payload,nil,function(msg)
 								BOT_STORAGE[message.guild.id].goalsSummary = {
-									channelId = message.channel.id,
+									channelId = data.channel.id,
 									messageId = msg.id,
 									nonce = msg.nonce
 								}
 								saveData()
-							end
-						else
-							local payload = util.buildGoalEmbed(message.guild)
-							local msg = message.channel:send(payload)
-							BOT_STORAGE[message.guild.id].goalsSummary = {
-								channelId = message.channel.id,
-								messageId = msg.id,
-								nonce = msg.nonce
-							}
-							saveData()
+							end)
 						end
 					end
 				end
 			else
 				local entry; for key,g in pairs(BOT_STORAGE[message.guild.id].goals) do; if g.name:lower() == name:lower() then; entry = key; break; end end
 				if not entry then
-					util.addToDelete(message:reply("`[Err]` - goal doesn't exist?"));
+					message:replydel("goal doesn't exist?")
 				else
 					local raw = args[3]
 					if raw then
 						-- trim whitespace
 						raw = raw:match("^%s*(.-)%s*$")
 						if raw:sub(1,1) == "#" then
-							local num = util.parseNumber(raw:sub(2))
+							local num = util:parseNumber(raw:sub(2))
 							if num then
 								BOT_STORAGE[message.guild.id].goals[entry].value = num
-								util.logInChannel(message.guild.id, "Updating goal '"..entry.."' to "..num)
+								util:logInChannel(message.guild.id, "Updating goal '"..entry.."' to "..num)
 							end
 						else
-							local delta = util.parseNumber(raw)
+							local delta = util:parseNumber(raw)
 							if delta then
 								BOT_STORAGE[message.guild.id].goals[entry].value = (BOT_STORAGE[message.guild.id].goals[entry].value or 0) + delta
-								util.logInChannel(message.guild.id, "Updating goal '"..entry.."' "..((delta >= 0) and ("+"..delta) or delta))
+								util:logInChannel(message.guild.id, "Updating goal '"..entry.."' "..((delta >= 0) and ("+"..delta) or delta))
 							end
 						end
 					end
 					if args[4] then
-						BOT_STORAGE[message.guild.id].goals[entry].goal = util.parseNumber(args[4])
+						BOT_STORAGE[message.guild.id].goals[entry].goal = util:parseNumber(args[4])
 					end
 					if BOT_STORAGE[message.guild.id].goalsSummary and (BOT_STORAGE[message.guild.id].goalsSummary.channelId and BOT_STORAGE[message.guild.id].goalsSummary.messageId) then
-						local ch = client:getChannel(BOT_STORAGE[message.guild.id].goalsSummary.channelId)
-						if ch then
-							local msg = ch:getMessage(BOT_STORAGE[message.guild.id].goalsSummary.messageId)
-							if msg and msg.author == client.user then
-								local payload = util.buildGoalEmbed(message.guild)
-								msg:setContent(payload.content or "")
-								msg:setEmbed(payload.embed)
+						local mseg = message
+						util:addToQueue(mseg.guild, nil, function()
+							local ch = client:getChannel(BOT_STORAGE[mseg.guild.id].goalsSummary.channelId)
+							if ch then
+								local msg = ch:getMessage(BOT_STORAGE[mseg.guild.id].goalsSummary.messageId)
+								if msg and msg.author == client.user then
+									local payload = util.buildGoalEmbed(mseg.guild)
+									msg:setContent(payload.content or "")
+									msg:setEmbed(payload.embed)
+								end
 							end
-						end
+						end)
 					end
 					saveData()
 				end
 			end
 		end
-		message:delete()
+		util:addToDelete(message)
 	end
 }
 local util = {}
