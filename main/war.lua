@@ -313,7 +313,7 @@ clock:on('sec', function(now)
 			if time > os.time() then 
 				-- continue, if only I had a function called CONTINUE. RAAGH
 			else
-				logger:log(3, 'Deleting garbage message..')
+				-- logger:log(4, 'Deleting garbage message..')
 				local savedmsg = msg_obj
 				local guild = savedmsg.guild
 				util:addToQueue(savedmsg.guild.id, nil, function() 
@@ -321,7 +321,7 @@ clock:on('sec', function(now)
 					local msg = channel and channel:getMessage(savedmsg.id)
 					if msg then 
 						msg:delete() 
-						logger:log(3, 'Deleted garbage message')
+						-- logger:log(4, 'Deleted garbage message')
 						util.todelete[key] = nil
 					end
 				end)
