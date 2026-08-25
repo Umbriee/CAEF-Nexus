@@ -23,7 +23,7 @@ m.commands["addlogchannel"] = {
 		local guildId = message.guild.id
 		BOT_STORAGE[guildId].logChannel = message.channel.id
 		saveData()
-		message:replydel("Channel successfully marked as a log channel for "..message.guild.name..".",10)
+		message:replydel("@silent Channel successfully marked as a log channel for "..message.guild.name..".",10)
 		message:delete()
 	end
 }

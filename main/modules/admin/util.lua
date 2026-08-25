@@ -1,6 +1,6 @@
 local moduleutil = {}
 
-function moduleutil.addNewTicket()
+function moduleutil:addNewTicket()
 
 end
 
