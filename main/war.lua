@@ -230,7 +230,7 @@ function handleHelpCommand(message, args)
 				description = table.concat({
 					"Type `"..BOT_PREFIX.."help [module]` for more info!",
 					"-# You are free to suggest ideas to @umbreeee, they always need more.~",
-					"-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus) if you are curious about anything.",
+					"-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus/tree/DoW-master) if you are curious about anything.",
 					"-# Will delete message to keep channel clean "..util:timeTill(120)
 				}, "\n"),
 				fields = {},
