@@ -38,23 +38,17 @@ function loadData()
 		print("Error: BOT_SAVEDATA path not defined")
 		return
 	end
-
 	local f = io.open(BOT_SAVEDATA, 'r')
 	if not f then
 		print("No saved data found or unable to open file")
 		return
 	end
-
 	local content = f:read('*a')
 	f:close()
-
 	if not content or content == "" then
 		print("File is empty")
 		return
 	end
-
-	-- print("File content:", content) -- Debug: print raw content
-
 	local ok, t = safeCall(function() return json.decode(content) end)
 	if ok and t then
 		print("Data loaded successfully!")
@@ -77,10 +71,7 @@ commandRegistry	= {}
 eventRegistry	= {}
 
 local handledEvents = {
-	["reactionAddAny"]		= true,
-	["reactionRemoveAny"]	= true,
 	["sec"]					= true,
-	["min"]					= true,
 	["memberJoin"]			= true,
 	["memberLeave"]			= true,
 	["messageCreate"]		= true,
@@ -151,8 +142,6 @@ local function runModuleEvent(eventStr,...)
 	end
 end
 	--==[ Discord Events RegisterYeh. ]==--
-client:on('reactionAddAny', function(...) runModuleEvent("reactionAddAny", ...) end)
-client:on('reactionRemoveAny', function(...) runModuleEvent("reactionRemoveAny", ...) end)
 local function parseArgsFromContent(content)
 	local s = content:sub(2)
 	local args = {}
@@ -351,7 +340,6 @@ clock:on('sec', function(now)
 	end
 	runModuleEvent("sec",now)
 end)
-clock:on('min', function(...)			runModuleEvent("min",			...) end)
 client:on('memberJoin', function(...)	runModuleEvent("memberJoin",	...) end)
 client:on('memberLeave', function(...)	runModuleEvent("memberLeave",	...) end)
 client:on('ready', function(...)
