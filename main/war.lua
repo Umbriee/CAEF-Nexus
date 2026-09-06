@@ -72,8 +72,6 @@ eventRegistry	= {}
 
 local handledEvents = {
 	["sec"]					= true,
-	["memberJoin"]			= true,
-	["memberLeave"]			= true,
 	["messageCreate"]		= true,
 	["ready"]				= true
 }
@@ -173,6 +171,81 @@ local function parseArgsFromContent(content)
 	end
 	return args
 end
+local function handleHelpCommand(message, args)
+	local emoji1, emoji2 = util:useEmoji("Havoc"), util:useEmoji("draconic_base")
+	if not args[2] then
+			--== Main help menu ==--
+		local payload = {
+			embed = {
+				title = emoji1.." "..client.user.name.." - Available Modules! "..emoji2,
+				description = table.concat({
+					"Type `"..BOT_PREFIX.."help [module]` for more info!",
+					"-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus/tree/DoW-master) if you are curious about anything, or wish to give me feedback!",
+					"-# Will delete message to keep channel clean "..util:timeTill(120)
+				}, "\n"),
+				fields = {},
+				color = discordia.Color.fromRGB(114, 137, 218).value,
+				timestamp = discordia.Date():toISO('T', 'Z')
+			}
+		}
+		for key, module in pairs(moduleRegistry) do
+			local commandCount = 0
+			for _ in pairs(module.commands) do commandCount = commandCount + 1 end
+
+			if commandCount > 0 and not module.module.hidehelp then
+				table.insert(payload.embed.fields, {
+					name = ("`%shelp` `%s`"):format(BOT_PREFIX, key),
+					value = ("%s, %s%s"):format(
+						module.module.name,
+						module.module.desc,
+						module.module.version and ("\n-# - Version "..module.module.version) or ""
+					),
+					inline = false
+				})
+			end
+		end
+		message.channel:senddel(payload,120)
+	else
+			--== Module-specific help ==--
+		local module = args[2]:lower()
+		if not moduleRegistry[module] then
+			message:replydel(("Module `%s` not found. Type `%shelp` for more info! Apologies!"):format(module, BOT_PREFIX))
+			util:addToDelete(message)
+			return
+		end
+		local moduleData = moduleRegistry[module]
+		if moduleData.module.hidehelp then return end
+		local payload = {
+			embed = {
+				title = emoji1.." "..moduleData.module.name.." - Available Commands! "..emoji2,
+				description = table.concat({
+					'`[field]` is required, `<field>` is optional. These are _linear_, so to build up you need the _previous values_ in your input.',
+					'You can also include spaces in your command by sorrounding it in quotation marks "like so"',
+					"-# Will delete message to clean channel "..util:timeTill(120)
+				}, "\n"),
+				fields = {},
+				color = discordia.Color.fromRGB(114, 137, 218).value,
+				timestamp = discordia.Date():toISO('T', 'Z')
+			}
+		}
+		for key, data in pairs(moduleData.commands) do
+			if data.helper then
+				table.insert(payload.embed.fields, {
+					name = "`"..BOT_PREFIX..(data.name or tostring(key)).."`",
+					value = table.concat({
+						"- Usage: `"..BOT_PREFIX..data.helper.."`",
+						data.fields and ("-# - Expected Fields: "..table.concat(data.fields, ", ")) or "",
+						data.perms and ("-# - Needed Permissions: "..table.concat(data.perms, ", ")) or ""
+					}, "\n"),
+					inline = false
+				})
+			end
+		end
+		message.channel:senddel(payload,120)
+	end
+	util:addToDelete(message)
+end
+
 client:enableIntents(discordia.enums.gatewayIntent.messageContent)
 client:on('messageCreate', function(message)
 		--== Early returns for non-command messages ==--
@@ -221,80 +294,6 @@ client:on('messageCreate', function(message)
 	ok, err)
 	runModuleEvent("messageCreate", message)
 end)
-function handleHelpCommand(message, args)
-	if not args[2] then
-			--== Main help menu ==--
-		local payload = {
-			embed = {
-				title = "<:logoColonial64:1501481247128555631> "..client.user.name.." - Available Modules! <:logoWarden64:1501481249745928272>",
-				description = table.concat({
-					"Type `"..BOT_PREFIX.."help [module]` for more info!",
-					"-# You are free to suggest ideas to @umbreeee, they always need more.~",
-					"-# I have a Github where my code is publicly shown [here](https://github.com/Umbriee/CAEF-Nexus/tree/DoW-master) if you are curious about anything.",
-					"-# Will delete message to keep channel clean "..util:timeTill(120)
-				}, "\n"),
-				fields = {},
-				color = discordia.Color.fromRGB(114, 137, 218).value,
-				timestamp = discordia.Date():toISO('T', 'Z')
-			}
-		}
-		for key, module in pairs(moduleRegistry) do
-			local commandCount = 0
-			for _ in pairs(module.commands) do commandCount = commandCount + 1 end
-
-			if commandCount > 0 and not module.module.hidehelp then
-				table.insert(payload.embed.fields, {
-					name = ("`%shelp` `%s`"):format(BOT_PREFIX, key),
-					value = ("%s, %s%s"):format(
-						module.module.name,
-						module.module.desc,
-						module.module.version and ("\n-# - Version "..module.module.version) or ""
-					),
-					inline = false
-				})
-			end
-		end
-		message.channel:senddel(payload,120)
-	else
-			--== Module-specific help ==--
-		local module = args[2]:lower()
-		if not moduleRegistry[module] then
-			message:replydel(("Module `%s` not found. Type `%shelp` for more info! Apologies!"):format(module, BOT_PREFIX))
-			util:addToDelete(message)
-			return
-		end
-		local moduleData = moduleRegistry[module]
-		if moduleData.module.hidehelp then return end
-		local payload = {
-			embed = {
-				title = "<:logoColonial64:1501481247128555631> "..moduleData.module.name.." - Available Commands! <:logoWarden64:1501481249745928272>",
-				description = table.concat({
-					'`[field]` is required, `<field>` is optional. These are _linear_, so to build up you need the _previous values_ in your input.',
-					'You can also include spaces in your command by sorrounding it in quotation marks "like so"',
-					"-# Will delete message to clean channel "..util:timeTill(120)
-				}, "\n"),
-				fields = {},
-				color = discordia.Color.fromRGB(114, 137, 218).value,
-				timestamp = discordia.Date():toISO('T', 'Z')
-			}
-		}
-		for key, data in pairs(moduleData.commands) do
-			if data.helper then
-				table.insert(payload.embed.fields, {
-					name = "`"..BOT_PREFIX..(data.name or tostring(key)).."`",
-					value = table.concat({
-						"- Usage: `"..BOT_PREFIX..data.helper.."`",
-						data.fields and ("-# - Expected Fields: "..table.concat(data.fields, ", ")) or "",
-						data.perms and ("-# - Needed Permissions: "..table.concat(data.perms, ", ")) or ""
-					}, "\n"),
-					inline = false
-				})
-			end
-		end
-		message.channel:senddel(payload,120)
-	end
-	util:addToDelete(message)
-end
 clock:on('sec', function(now)
 	if util.todelete and next(util.todelete) then
 		for key, data in pairs(util.todelete) do
@@ -340,8 +339,6 @@ clock:on('sec', function(now)
 	end
 	runModuleEvent("sec",now)
 end)
-client:on('memberJoin', function(...)	runModuleEvent("memberJoin",	...) end)
-client:on('memberLeave', function(...)	runModuleEvent("memberLeave",	...) end)
 client:on('ready', function(...)
 	logger:log(3, 'Bot started as "%s" in %s servers', (client.user.username..'" / "'..client.user.name), #client.guilds)
 	runModuleEvent("ready",...)
@@ -351,7 +348,7 @@ client:on('ready', function(...)
 				if key == "module" then
 					-- continue
 				elseif type(datum) == "table" then
-					logger:log(2,"Unhandled event from module '"..datum.module.."' on '"..event..".' Adding to eventRegistry in full")
+					logger:log(4,"Unhandled event from module '"..datum.module.."' on '"..event..".' Adding to eventRegistry in full")
 					local func = function(...) runModuleEvent(event, ...) end
 					client:on(event, func)
 					handledEvents[event] = true
@@ -359,6 +356,9 @@ client:on('ready', function(...)
 			end
 		end
 	end
+	-- for key, data in pairs(client._emoji_map) do
+	-- 	print(key,data)
+	-- end
 end)
 clock:start(false)
 local BOT_TOKEN = require("privateStorage.bottoken")

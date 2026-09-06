@@ -96,6 +96,40 @@ function util:roundNumber(num, decimal)
 	num = math.floor(tonumber(num)*(10^dec))/(10^dec)
 	return num
 end
+util.developerportalemojis = {
+	{
+		name = "Havoc",
+		id = "1546249166663983157"
+	},
+	{
+		name = "draconic_base",
+		id = "1546250214124429352"
+	},
+	{
+		name = "Lua",
+		id = "1546262056498634973"
+	}
+}
+function util:findEmoji(sName)
+	for _, v in pairs(util.developerportalemojis) do
+		if v.name == sName then
+			return {id = v.id, name = v.name}
+		end
+	end
+	local tbl = client._emoji_map
+	for sEmojiId, oGuildOrigin in pairs(tbl) do
+		local emojiObj = client:getEmoji(sEmojiId)
+		if emojiObj and emojiObj.name == sName then return emojiObj end
+	end
+end
+function util:useEmoji(sName)
+	local oEmoji = self:findEmoji(sName)
+	if not oEmoji then 
+		logger:log(4, 'Unable to locate'..sName..' emoji in the bot\'s cache, returning empty string instead!')
+		return ""
+	end
+	return "<:"..sName..":"..oEmoji.id..">"
+end
 function util:isfunction(var) return type(var) == 'function' end
 function util:ismessage(var) return getmetatable(var) == 'class Message' end
 --==| Taken from: [gist](https://gist.github.com/marcotrosi/163b9e890e012c6a460a) Owned by Marco Trosi, Last Updated May 25th, 2015.|==--
