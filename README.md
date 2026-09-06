@@ -1,21 +1,17 @@
-# CAEF Nexus
-#### "*Caoiva Avali Exploratory Fleet*"
-"*A modular Discord bot handler for Foxhole, built on the Discordia API*"
+# Disco of War
+#### "*Discords of War Terminal*"
+"*A modular Discord bot handler for servers, built on the Discordia API*"
 
 [![Discordia](https://img.shields.io/badge/Discordia-v3.0-blue)](https://github.com/SinisterRectus/Discordia)
 [![Lua](https://img.shields.io/badge/Lua-5.4-yellow)](https://www.lua.org/)
-[![Foxhole](https://img.shields.io/badge/Foxhole-Active-red)](https://www.foxholegame.com/)
 
 ---
 
 ## 📌 Overview
-CAEF Nexus is a **Discord Bot**(.. Or application?) designed specifically for our regiment group in the game **Foxhole**. It provides a **plug-and-play modular system** for managing in-game logistics, tracking resources, and facilitating communication between players.
+Disco of War is a **Discord Bot**(.. Or application?) designed specifically for a Discord Server. It provides a **plug-and-play modular system** for managing, automation, and other such that I decide to add.
 
-Built on the **Discordia API**, CAEF-Nexus offers:
-✅ **Real-time Foxhole API integration** (detailed info provided on war status)
-✅ **Resource tracking** (fuel, supplies, stockpiles)
+Built on the **Discordia API**, DoW offers:
 ✅ **Role-based reaction systems** (quick role selection)
-✅ **Customizable goal tracking** (regiment progress, rare collection)
 ✅ **Modular architecture** (easy to extend with new features)
 
 ---
@@ -24,25 +20,20 @@ Built on the **Discordia API**, CAEF-Nexus offers:
 ### 🔹 Core Modules
 | Module | Description |
 |--------|-------------|
-| **Supply Tracker** | Monitors Maintenance Supplies and generator fuel levels, giving an estimate to when they drop. |
-| **Stockpile Manager** | Tracks stockpile reserves and predicts time till they expire. |
 | **Role Reaction System** | Simplified role selection for general discord. |
-| **Goal Summaries** | Tracks regiment progress (e.g., track collectively how many rares mined). |
-| **Foxhole API Integration** | Fetches real-time war data provided. |
 
 ### 🔹 Additional Features
 - **Plug-and-play modules** (load on startup, share data seamlessly)
-- **Customizable alerts** (notifications for when stockpiles are about to expire)
 - **Modular architecture** (easy to add new features and commands with easy examples of organization)
 
 ---
 
 ## 📂 Project Structure
 ```
-CAEF-Nexus/main/
+DoW/main/
 ├── modules/          # Modular components
 │   ├── module/       # module name, unique and lowerish case
-│   └─── shared.lua   # loads this file for info. Can include others per example 'upkeep' module.
+│   └─── shared.lua   # loads this file for info. Can include others per example 'admin' module.
 ├── libs/             # Core libraries
 └── war.lua           # Entry point
 ```
@@ -56,5 +47,4 @@ Contributions are welcome! Open an issue or submit a pull request.
 
 ### 🔗 Links
 - [Discordia API](https://github.com/SinisterRectus/Discordia) (Core framework)
-- [Foxhole Game](https://www.foxholegame.com/)
 ---

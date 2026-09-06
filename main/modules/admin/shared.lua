@@ -1,7 +1,7 @@
 local m = {}
 m.module = {
 	name	= "Admin",
-	desc	= "A bunch of utilities, admin commands, and otherwise automatic handling for CAEF specific operations.",
+	desc	= "A bunch of utilities, admin commands, and otherwise automatic handling for some specific operations.",
 	version	= "1.0",
 	hidehelp = true
 }
